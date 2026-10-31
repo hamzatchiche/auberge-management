@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\administration\AubergeManagement;
 use App\Http\Controllers\administration\UserManagement;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\AuthController;
@@ -32,7 +33,7 @@ Route::post('/auth/reset-password', [
     'reset',
 ])->middleware('throttle:6,1');
 
-
+Route::get('/auberge',[AubergeManagement::class,'getAubergeInfos']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me/update', [AuthController::class, 'updateProfile']);
@@ -46,10 +47,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function (){
     Route::post('/administration/createReceptionniste', [UserManagement::class,'createReceptionniste']);
     Route::delete('/administration/receptionniste',[UserManagement::class, 'removeReceptionniste']);
     Route::get('/administration/AllUsers',[UserManagement::class,'getAllUsers']);
-
+    Route::patch('/auberge/{auberge}',[AubergeManagement::class,'updateAubergeInfo']);
 });
-//  Route::middleware('auth:sanctum')->group(function () {
-//     Route::get('/me', function (Request $request) {
-//         return $request->user();
-//     });
-// });
+Route::get('/chambres',[AubergeManagement::class,'getChambres']);
+Route::middleware(['auth:sanctum','role:receptionniste'])->group(function(){
+    Route::post('/chambre',[AubergeManagement::class,'createChambre']);
+    Route::patch('/chambre/{chambre}',[AubergeManagement::class,'updateChambre']);
+    Route::delete('/chambre/{chambre}',[AubergeManagement::class,'deleteChambre']);
+});
