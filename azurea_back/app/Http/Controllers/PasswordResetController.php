@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Role;
 use App\Models\User;
+use App\Services\AuthService;
 use Hash;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +16,7 @@ use Str;
 
 class PasswordResetController extends Controller
 {
+    public function __construct(private AuthService $authService){}
     public function forgot(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -40,43 +43,61 @@ class PasswordResetController extends Controller
                 'required',
                 'confirmed',
                 PasswordRule::min(8),
-            ],
-
+            ],        
         ]);
+        $resetUser=null;
         $status = Password::reset(
-            $data,
-            function (User $user, string $password) {
-                $user->forceFill(
-                    [
-                        'password' => Hash::make($password),
-                        'remember_token' => Str::random(60),
-                    ]
-                )->save();
-                $user->tokens()->delete();
-                event(new PasswordReset($user));
+        $data,
+        function (User $user, string $password) use (&$resetUser) {
 
+            $user->forceFill([
+                'password' => Hash::make($password),
+                'remember_token' => Str::random(60),
+            ]);
 
-                Mail::send('emails.password-changed', ['user' => $user], function ($message) use ($user) {
-                    $message->to($user->email)
-                        ->subject('Sécurité de votre compte Azuveria — Mot de passe modifié');
-                });
-                //          Mail::raw(
-                //     'Votre mot de passe Azuveria a été modifié avec succès. Si vous n’êtes pas à l’origine de cette modification, contactez notre support.',
-                //     function ($message) use ($user) {
-                //         $message->to($user->email)
-                //                 ->subject('Confirmation de changement de mot de passe - Azuveria');
-                //     }
-                // );
+            if (
+                $user->role === Role::Receptionniste
+                && $user->email_verified_at === null
+            ) {
+                $user->email_verified_at = now();
             }
 
-        );
-        if ($status !== Password::PASSWORD_RESET) {
-            return response()->json([
-                'message' => 'Le lien est invalide ou a expiré. Demandez un nouveau lien.',
-            ], 422);
+            $user->save();
+
+            $user->tokens()->delete();
+
+            $resetUser = $user;
         }
+    );
+
+    Mail::send(
+        'emails.password-changed',
+        ['user' => $resetUser],
+        function ($message) use ($resetUser) {
+            $message->to($resetUser->email)
+                ->subject(
+                    'Sécurité de votre compte Azuveria — Mot de passe modifié'
+                );
+        }
+    );
+
+    return response()->json([
+        'message' => 'Mot de passe réinitialisé avec succès.',
+    ]);
+    }
+    public function changePassword(Request $request): JsonResponse{
+     $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => [
+                'required',
+                'confirmed',
+                PasswordRule::min(8),
+            ],
+        ]);
+        $user=$request->user();
+        $this->authService->changePassword($user,$data);
         return response()->json([
-            'message' => 'Mot de passe réinitialisé avec succès.',
+            'message' => 'Mot de passe modifié avec succès.',
         ]);
     }
 }

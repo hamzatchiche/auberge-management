@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\administration\UserManagement;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PasswordResetController;
@@ -36,11 +37,17 @@ Route::post('/auth/reset-password', [
 Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me/update', [AuthController::class, 'updateProfile']);
     Route::get('/me', [AuthController::class, 'UserInfo']);
+    Route::patch('/me/changepassword',[PasswordResetController::class,'changePassword']);
 });
 
 Route::post('/auth/logout',[AuthController::class,'logout'])->middleware('auth:sanctum');
 
+Route::middleware(['auth:sanctum', 'role:admin'])->group(function (){
+    Route::post('/administration/createReceptionniste', [UserManagement::class,'createReceptionniste']);
+    Route::delete('/administration/receptionniste',[UserManagement::class, 'removeReceptionniste']);
+    Route::get('/administration/AllUsers',[UserManagement::class,'getAllUsers']);
 
+});
 //  Route::middleware('auth:sanctum')->group(function () {
 //     Route::get('/me', function (Request $request) {
 //         return $request->user();
