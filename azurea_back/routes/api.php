@@ -5,6 +5,7 @@ use App\Http\Controllers\administration\UserManagement;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\ReservationManagement;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Attributes\Controllers\Middleware;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me/update', [AuthController::class, 'updateProfile']);
     Route::get('/me', [AuthController::class, 'UserInfo']);
     Route::patch('/me/changepassword',[PasswordResetController::class,'changePassword']);
+    Route::post('/chambres/{chambre}/reservation',[ReservationManagement::class,'createreservation']);
+    Route::patch('/reservations/{reservation}/cancel',[ReservationManagement::class, 'cancelReservation']);
+    Route::get('/me/reservations',[ReservationManagement::class, 'getUserReservations']);
+    Route::get('/me/reservations/{reservationId}',[ReservationManagement::class, 'getUserReservationById']);
 });
 
 Route::post('/auth/logout',[AuthController::class,'logout'])->middleware('auth:sanctum');
@@ -50,8 +55,14 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function (){
     Route::patch('/auberge/{auberge}',[AubergeManagement::class,'updateAubergeInfo']);
 });
 Route::get('/chambres',[AubergeManagement::class,'getChambres']);
+Route::get('/availableChambres',[AubergeManagement::class,'getAvailablechambres']);
+Route::get('/services',[AubergeManagement::class,'getServices']);
 Route::middleware(['auth:sanctum','role:receptionniste'])->group(function(){
     Route::post('/chambre',[AubergeManagement::class,'createChambre']);
     Route::patch('/chambre/{chambre}',[AubergeManagement::class,'updateChambre']);
     Route::delete('/chambre/{chambre}',[AubergeManagement::class,'deleteChambre']);
+    // services
+    Route::post('/service',[AubergeManagement::class,'addService']);
+    Route::patch('/service/{service}',[AubergeManagement::class,'updateService']);
+    Route::delete('/service/{service}',[AubergeManagement::class,'deleteService']);
 });

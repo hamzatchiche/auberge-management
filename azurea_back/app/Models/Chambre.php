@@ -14,7 +14,7 @@ class Chambre extends Model
     public function auberge():BelongsTo{
         return $this->belongsTo(Auberge::class);
     }
-    public function reservation():HasMany{
+    public function reservations():HasMany{
         return $this->hasMany(Reservation::class);
     }
 }

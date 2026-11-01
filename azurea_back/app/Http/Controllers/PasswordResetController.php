@@ -16,7 +16,9 @@ use Str;
 
 class PasswordResetController extends Controller
 {
-    public function __construct(private AuthService $authService){}
+    public function __construct(private AuthService $authService)
+    {
+    }
     public function forgot(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -43,50 +45,51 @@ class PasswordResetController extends Controller
                 'required',
                 'confirmed',
                 PasswordRule::min(8),
-            ],        
+            ],
         ]);
-        $resetUser=null;
+        $resetUser = null;
         $status = Password::reset(
-        $data,
-        function (User $user, string $password) use (&$resetUser) {
+            $data,
+            function (User $user, string $password) use (&$resetUser) {
 
-            $user->forceFill([
-                'password' => Hash::make($password),
-                'remember_token' => Str::random(60),
-            ]);
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ]);
 
-            if (
-                $user->role === Role::Receptionniste
-                && $user->email_verified_at === null
-            ) {
-                $user->email_verified_at = now();
+                if (
+                    $user->role === Role::Receptionniste
+                    && $user->email_verified_at === null
+                ) {
+                    $user->email_verified_at = now();
+                }
+
+                $user->save();
+
+                $user->tokens()->delete();
+
+                $resetUser = $user;
             }
+        );
 
-            $user->save();
+        Mail::send(
+            'emails.password-changed',
+            ['user' => $resetUser],
+            function ($message) use ($resetUser) {
+                $message->to($resetUser->email)
+                    ->subject(
+                        'Sécurité de votre compte Azuveria — Mot de passe modifié'
+                    );
+            }
+        );
 
-            $user->tokens()->delete();
-
-            $resetUser = $user;
-        }
-    );
-
-    Mail::send(
-        'emails.password-changed',
-        ['user' => $resetUser],
-        function ($message) use ($resetUser) {
-            $message->to($resetUser->email)
-                ->subject(
-                    'Sécurité de votre compte Azuveria — Mot de passe modifié'
-                );
-        }
-    );
-
-    return response()->json([
-        'message' => 'Mot de passe réinitialisé avec succès.',
-    ]);
+        return response()->json([
+            'message' => 'Mot de passe réinitialisé avec succès.',
+        ]);
     }
-    public function changePassword(Request $request): JsonResponse{
-     $data = $request->validate([
+    public function changePassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
             'current_password' => ['required', 'string'],
             'password' => [
                 'required',
@@ -94,8 +97,8 @@ class PasswordResetController extends Controller
                 PasswordRule::min(8),
             ],
         ]);
-        $user=$request->user();
-        $this->authService->changePassword($user,$data);
+        $user = $request->user();
+        $this->authService->changePassword($user, $data);
         return response()->json([
             'message' => 'Mot de passe modifié avec succès.',
         ]);

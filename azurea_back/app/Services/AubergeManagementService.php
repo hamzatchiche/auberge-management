@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\StatutChambre;
+use App\Enums\StatutReservation;
 use App\Models\Auberge;
 use App\Models\Chambre;
+use App\Models\Service;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class AubergeManagementService
@@ -30,13 +33,37 @@ class AubergeManagementService
     public function deleteChambre(Chambre $chambre){
         $chambre->delete();
     }
+    public function getAvailablechambres(array $data){
+        $nombrePersonnes=$data['nombre_adultes']+$data['nombre_enfants'];
+        return Chambre::query()
+        ->where('capacite','>=',$nombrePersonnes)
+
+        ->whereNotIn('status',[
+            StatutChambre::EnMaintenance->value,
+            StatutChambre::EnNettoyage->value,
+        ])
+        ->whereDoesntHave('reservations',function($query) use ($data){
+            $query->whereIn('statut',[
+                StatutReservation::Confirmee->value,
+                StatutReservation::EnCours->value,
+            ])
+            ->where('date_debut','<',$data['date_fin'])
+            ->where('date_fin','>' ,$data['date_debut']);
+        })
+        ->get();
+    }
     // gestion des services
     public function getServices(){
-
+        $service=Service::select('id','nom','description','prix_unitaire','actif')->paginate(10);
+        return $service;
     }
     public function addService(Auberge $auberge,array $data){
         $auberge->services()->create($data);
     }
-    public function updateService(){}
-    public function deleteService(){}
+    public function updateService(Service $service,array $data){
+        $service->update($data);
+    }
+    public function deleteService(Service $service){
+        $service->delete();
+    }
 }
