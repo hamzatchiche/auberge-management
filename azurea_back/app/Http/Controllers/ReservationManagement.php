@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Chambre;
+use App\Models\Facture;
 use App\Models\Reservation;
 use App\Services\ReservationManagementService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -101,6 +102,15 @@ class ReservationManagement extends Controller
 
         return response()->json([
             'message' => 'Réservation annulée avec succès.'
+        ]);
+    }
+    public function getFactures(){
+        return $this->reservationService->getFactures();
+    }
+    public function payefacture(Facture $facture):JsonResponse{
+        $facture=$this->reservationService->payefacture($facture);
+        return response()->json([
+            'mesage'=>'facture payée avec succès'
         ]);
     }
 }

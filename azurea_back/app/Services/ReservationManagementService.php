@@ -220,7 +220,7 @@ class ReservationManagementService
             'prix_total',
         ])
         ->with([
-            'user:id,nom,prenom,email',
+            'user:id,nom,prenom',
             'chambre:id,numero,type,prix_nuit',
             'reservationServices:id,reservation_id,service_id,quantite,prix_unitaire_applique',
             'reservationServices.service:id,nom,description,prix_unitaire',
@@ -252,5 +252,19 @@ class ReservationManagementService
             $reservation->statut = StatutReservation::Annulee;
             $reservation->save();
         });
+    }
+    // public function getFactures(){
+    //     return Facture::with('reservation')
+    //     ->where(Reservation)
+    //     ;
+    // }
+    public function payefacture(Facture $facture){
+    if($facture->statut==StatutFacture::Payee){
+        throw ValidationException::withMessages(
+            ['message'=> 'cette facture est déja payée']
+        );
+    };
+        $facture->statut=StatutFacture::Payee;
+        $facture->save();
     }
 }
