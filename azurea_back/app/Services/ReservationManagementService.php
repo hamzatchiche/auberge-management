@@ -253,11 +253,19 @@ class ReservationManagementService
             $reservation->save();
         });
     }
-    // public function getFactures(){
-    //     return Facture::with('reservation')
-    //     ->where(Reservation)
-    //     ;
-    // }
+    public function getFactures(){
+        return Facture::whereHas('reservation', function($query){
+            $query->where('statut','!=',StatutReservation::Annulee->value);
+
+        })
+        ->with([
+              'reservation:id,user_id,chambre_id,date_debut,date_fin,statut,prix_total',
+            'reservation.user:id,nom,prenom',
+            'reservation.chambre:id,numero,type',
+            'lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
+        ])
+        ->paginate(12);
+    }
     public function payefacture(Facture $facture){
     if($facture->statut==StatutFacture::Payee){
         throw ValidationException::withMessages(
@@ -267,4 +275,14 @@ class ReservationManagementService
         $facture->statut=StatutFacture::Payee;
         $facture->save();
     }
+    // public function addServicetoReservation(Reservation $reservation,User $user){
+    // return DB::transaction(function () use ($reservation,$user){
+    //     $reservation=Reservation::where('id'->$reservation->id)
+    //     ->lockForUpdate()
+    //     ->firstOrFail();
+    //     if($reservation->user_id!=$user->id){
+    //         abort(403, 'Vous ne pouvez pas annuler cette réservation.');
+    //     };
+    // } );
+    // }
 }

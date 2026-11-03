@@ -105,7 +105,10 @@ class ReservationManagement extends Controller
         ]);
     }
     public function getFactures(){
-        return $this->reservationService->getFactures();
+        $factures= $this->reservationService->getFactures();
+        return response()->json([
+            'factures'=>$factures,
+        ]);
     }
     public function payefacture(Facture $facture):JsonResponse{
         $facture=$this->reservationService->payefacture($facture);
