@@ -45,6 +45,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/reservations/{reservation}/cancel',[ReservationManagement::class, 'cancelReservation']);
     Route::get('/me/reservations',[ReservationManagement::class, 'getUserReservations']);
     Route::get('/me/reservations/{reservationId}',[ReservationManagement::class, 'getUserReservationById']);
+    Route::patch(
+    '/reservations/{reservation}/services',
+    [ReservationManagement::class, 'addServiceToReservation']
+)->middleware('auth:sanctum');
     Route::post('/auth/logout',[AuthController::class,'logout']);
 });
 

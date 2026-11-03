@@ -7,6 +7,7 @@ use App\Enums\StatutReservation;
 use App\Models\Auberge;
 use App\Models\Chambre;
 use App\Models\Service;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class AubergeManagementService
@@ -50,6 +51,15 @@ class AubergeManagementService
             ->where('date_debut','<',$data['date_fin'])
             ->where('date_fin','>' ,$data['date_debut']);
         })
+        ->select([
+            'id',
+            'auberge_id',
+            'numero',
+            'type',
+            'capacite',
+            'prix_nuit',
+            'status',
+        ])
         ->get();
     }
     // gestion des services

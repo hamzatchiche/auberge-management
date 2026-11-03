@@ -116,4 +116,58 @@ class ReservationManagement extends Controller
             'mesage'=>'facture payée avec succès'
         ]);
     }
+    public function addServicetoReservation( Request $request,
+    Reservation $reservation):JsonResponse{
+         $data = $request->validate([
+        'services' => ['required', 'array', 'min:1'],
+
+        'services.*.service_id' => [
+            'required',
+            'integer',
+            'distinct',
+            'exists:services,id',
+        ],
+
+        'services.*.quantite' => [
+            'required',
+            'integer',
+            'min:1',
+        ],
+    ]);
+    $reservationupdated=$this->reservationService->addServicetoReservation($reservation
+    ,$request->user(),$data);
+    $reservation->load([
+            'user',
+            'chambre',
+            'reservationServices.service',
+            'facture.lignesFacture',
+        ]);
+    $pdf = Pdf::loadView('emails.reservation-facture', [
+            'user' => $request->user(),
+            'reservation' => $reservation,
+        ]);
+        Mail::send(
+            'emails.add-service',
+            [
+                'user' => $request->user(),
+                'reservation' => $reservation,
+            ],
+
+            function ($message) use ($request, $reservation, $pdf) {
+                $message
+                    ->to($request->user()->email)
+                    ->subject('Confirmation de votre réservation - Azuveria')
+                    ->attachData(
+                        $pdf->output(),
+                        'reservation-' . $reservation->id . '.pdf',
+                        [
+                            'mime' => 'application/pdf',
+                        ]
+                    );
+            }
+        );
+    return response()->json([
+        'message' => 'Les services ont été ajoutés à la réservation.'
+    ]);
+    }
 }

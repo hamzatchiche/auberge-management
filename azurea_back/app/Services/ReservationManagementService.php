@@ -275,14 +275,74 @@ class ReservationManagementService
         $facture->statut=StatutFacture::Payee;
         $facture->save();
     }
-    // public function addServicetoReservation(Reservation $reservation,User $user){
-    // return DB::transaction(function () use ($reservation,$user){
-    //     $reservation=Reservation::where('id'->$reservation->id)
-    //     ->lockForUpdate()
-    //     ->firstOrFail();
-    //     if($reservation->user_id!=$user->id){
-    //         abort(403, 'Vous ne pouvez pas annuler cette réservation.');
-    //     };
-    // } );
-    // }
+    public function addServicetoReservation(Reservation $reservation,User $user,array $data){
+    return DB::transaction(function () use ($reservation,$user,$data){
+        $reservation=Reservation::where('id',$reservation->id)
+        ->lockForUpdate()
+        ->firstOrFail();
+        if($reservation->user_id!=$user->id){
+            abort(403, 'Vous ne pouvez pas modifier cette réservation.');
+        };
+        if($reservation->statut===StatutReservation::Annulee){
+            throw ValidationException::withMessages([
+                'reservation' => 'Impossible d’ajouter des services à une réservation annulée.',
+            ]);
+        }
+        $facture=Facture::where('reservation_id',$reservation->id)
+        ->lockForUpdate()
+        ->firstOrFail();
+        if($facture->statut===StatutFacture::Payee){
+            throw ValidationException::withMessages([
+                'facture' => 'Cette facture est déjà payée.',
+            ]);
+        }
+        $prixServices = 0;
+
+            foreach ($data['services'] as $serviceData) {
+
+                $service = Service::query()
+                    ->where('id', $serviceData['service_id'])
+                    ->where('actif', true)
+                    ->first();
+
+                if (!$service) {
+                    throw ValidationException::withMessages([
+                        'services' => 'Un service sélectionné est inexistant ou inactif.',
+                    ]);
+                }
+
+                $quantite = (int) $serviceData['quantite'];
+                $prixUnitaire = (float) $service->prix_unitaire;
+                $sousTotal = $quantite * $prixUnitaire;
+
+                // Créer le lien Reservation-Service
+                ReservationService::create([
+                    'reservation_id' => $reservation->id,
+                    'service_id' => $service->id,
+                    'quantite' => $quantite,
+                    'prix_unitaire_applique' => $prixUnitaire,
+                ]);
+
+                //Ajouter le service à la facture
+                LigneFacture::create([
+                    'facture_id' => $facture->id,
+                    'description' => $service->nom,
+                    'quantite' => $quantite,
+                    'prix_unitaire' => $prixUnitaire,
+                    'sous_total' => $sousTotal,
+                ]);
+
+                $prixServices += $sousTotal;
+            }
+            $facture->montant_total+=$prixServices;
+            $facture->save();
+            $reservation->prix_total+=$prixServices;
+            $reservation->save();
+            return $reservation->load([
+            'chambre',
+            'reservationServices.service',
+            'facture.lignesFacture',
+        ]);
+    });
+    }
 }
