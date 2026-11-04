@@ -110,6 +110,12 @@ class ReservationManagement extends Controller
             'factures'=>$factures,
         ]);
     }
+    public function getUserFactures(Request $request){
+        $factures=$this->reservationService->getUserFactures($request->user());
+        return response()->json([
+            'factures'=>$factures
+        ]);
+    }
     public function payefacture(Facture $facture):JsonResponse{
         $facture=$this->reservationService->payefacture($facture);
         return response()->json([
@@ -176,7 +182,10 @@ class ReservationManagement extends Controller
             'message'=>'check In fait avec succès'
         ]);
     }
-    public function CheckOut(){
-
+    public function CheckOut(Reservation $reservation):JsonResponse{
+    $reservation=$this->reservationService->CheckOut($reservation);
+    return response()->json([
+        'message'=>'check out fait avec succès',
+    ]);
     }
 }

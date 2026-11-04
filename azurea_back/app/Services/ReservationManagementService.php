@@ -266,6 +266,18 @@ class ReservationManagementService
         ])
         ->paginate(12);
     }
+    public function getUserFactures(User $user){
+        return $user->reservation()
+        ->with([
+            'facture:id,reservation_id,numero,date_emission,montant_total,statut',
+            'facture.lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
+        
+        ])
+        ->get()
+        ->pluck('facture')
+        ->filter()
+        ->values();
+    }
     public function payefacture(Facture $facture){
     if($facture->statut==StatutFacture::Payee){
         throw ValidationException::withMessages(
@@ -375,9 +387,14 @@ class ReservationManagementService
         $reservation=Reservation::where('id',$reservation->id)
             ->lockForUpdate()
             ->firstOrFail();
-            if($reservation->check_out===null){
+            if($reservation->check_out!=null){
                 throw ValidationException::withMessages([
                     'message'=>'ce client à déja fais le check out'
+                ]);
+            }
+            if($reservation->check_in===null){
+                throw ValidationException::withMessages([
+                    'message'=>'ce client n\'est pas encore fais le checkIn'
                 ]);
             }
             $reservation->check_out=now();
