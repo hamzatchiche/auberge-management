@@ -170,4 +170,13 @@ class ReservationManagement extends Controller
         'message' => 'Les services ont été ajoutés à la réservation.'
     ]);
     }
+    public function CheckIn(Reservation $reservation):JsonResponse{
+        $reservation=$this->reservationService->CheckIn($reservation);
+         return response()->json([
+            'message'=>'check In fait avec succès'
+        ]);
+    }
+    public function CheckOut(){
+
+    }
 }

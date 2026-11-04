@@ -345,4 +345,42 @@ class ReservationManagementService
         ]);
     });
     }
+    public function CheckIn(Reservation $reservation){
+        return DB::transaction(function () use ($reservation){
+            $reservation=Reservation::where('id',$reservation->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+                if($reservation->statut===StatutReservation::Annulee){
+                    throw ValidationException::withMessages(
+                        [
+                            'message'=>'cette reservation est déja annulée.'
+                        ]
+                    );
+                };
+                if($reservation->check_in!=null){
+                    throw ValidationException::withMessages([
+                        'message'=>'ce client déja fait le check In'
+                    ]);
+                }
+                if($reservation->date_debut>now()){
+                    throw ValidationException::withMessages([
+                        'message'=>'le temps de check in n\'est pas encore arrivé'
+                    ]);
+                }
+                $reservation->check_in=now();
+                $reservation->save();
+        });
+    }
+    public function CheckOut(Reservation $reservation){
+        $reservation=Reservation::where('id',$reservation->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+            if($reservation->check_out===null){
+                throw ValidationException::withMessages([
+                    'message'=>'ce client à déja fais le check out'
+                ]);
+            }
+            $reservation->check_out=now();
+            $reservation->save();
+    }
 }
