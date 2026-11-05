@@ -8,6 +8,7 @@ use App\Models\Auberge;
 use App\Models\Chambre;
 use App\Models\Service;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class AubergeManagementService
@@ -30,6 +31,15 @@ class AubergeManagementService
     }
     public function updateChambre(Chambre $chambre,array $data){
         $chambre->update($data);
+    }
+    public function updateStatusChambre(Chambre $chambre,string $status){
+        if($chambre->status===StatutChambre::Occupee){
+            throw ValidationException::withMessages([
+            'status' => 'Impossible de libérer une chambre occupée.',
+        ]);
+        }
+        $chambre->status=$status;
+        $chambre->save();
     }
     public function deleteChambre(Chambre $chambre){
         $chambre->delete();

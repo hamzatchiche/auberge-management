@@ -117,7 +117,7 @@ class ReservationManagement extends Controller
         ]);
     }
     public function payefacture(Facture $facture):JsonResponse{
-        $facture=$this->reservationService->payefacture($facture);
+        $this->reservationService->payefacture($facture);
         return response()->json([
             'mesage'=>'facture payée avec succès'
         ]);
@@ -183,7 +183,7 @@ class ReservationManagement extends Controller
         ]);
     }
     public function CheckOut(Reservation $reservation):JsonResponse{
-    $reservation=$this->reservationService->CheckOut($reservation);
+    $this->reservationService->CheckOut($reservation);
     return response()->json([
         'message'=>'check out fait avec succès',
     ]);

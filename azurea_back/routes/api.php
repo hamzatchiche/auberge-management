@@ -62,6 +62,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 Route::middleware(['auth:sanctum', 'role:receptionniste'])->group(function () {
     Route::post('/chambre', [AubergeManagement::class, 'createChambre']);
     Route::patch('/chambre/{chambre}', [AubergeManagement::class, 'updateChambre']);
+    Route::patch('/chambre/{chambre}/status', [AubergeManagement::class, 'updateStatusChambre']);
     Route::delete('/chambre/{chambre}', [AubergeManagement::class, 'deleteChambre']);
     Route::get('/factures', [ReservationManagement::class, 'getFactures']);
     Route::post('/facture/{facture}', [ReservationManagement::class, 'payefacture']);

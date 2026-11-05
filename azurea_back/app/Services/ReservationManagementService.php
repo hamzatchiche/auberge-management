@@ -192,8 +192,8 @@ class ReservationManagementService
         return $user->reservation()
             ->select([
                 'id',
-                 'user_id',
-                 'chambre_id',
+                'user_id',
+                'chambre_id',
                 'date_debut',
                 'date_fin',
                 'statut',
@@ -206,29 +206,29 @@ class ReservationManagementService
             ->paginate(12);
     }
     public function getUserReservationById(User $user, int $reservationId)
-{
-    return $user->reservation()
-        ->select([
-            'id',
-            'user_id',
-            'chambre_id',
-            'date_debut',
-            'date_fin',
-            'nombre_adultes',
-            'nombre_enfants',
-            'statut',
-            'prix_total',
-        ])
-        ->with([
-            'user:id,nom,prenom',
-            'chambre:id,numero,type,prix_nuit',
-            'reservationServices:id,reservation_id,service_id,quantite,prix_unitaire_applique',
-            'reservationServices.service:id,nom,description,prix_unitaire',
-            'facture:id,reservation_id,numero,date_emission,montant_total,statut',
-            'facture.lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
-        ])
-        ->findOrFail($reservationId);
-}
+    {
+        return $user->reservation()
+            ->select([
+                'id',
+                'user_id',
+                'chambre_id',
+                'date_debut',
+                'date_fin',
+                'nombre_adultes',
+                'nombre_enfants',
+                'statut',
+                'prix_total',
+            ])
+            ->with([
+                'user:id,nom,prenom',
+                'chambre:id,numero,type,prix_nuit',
+                'reservationServices:id,reservation_id,service_id,quantite,prix_unitaire_applique',
+                'reservationServices.service:id,nom,description,prix_unitaire',
+                'facture:id,reservation_id,numero,date_emission,montant_total,statut',
+                'facture.lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
+            ])
+            ->findOrFail($reservationId);
+    }
     public function cancelReservation(Reservation $reservation, User $user)
     {
         return DB::transaction(function () use ($reservation, $user) {
@@ -253,62 +253,67 @@ class ReservationManagementService
             $reservation->save();
         });
     }
-    public function getFactures(){
-        return Facture::whereHas('reservation', function($query){
-            $query->where('statut','!=',StatutReservation::Annulee->value);
+    public function getFactures()
+    {
+        return Facture::whereHas('reservation', function ($query) {
+            $query->where('statut', '!=', StatutReservation::Annulee->value);
 
         })
-        ->with([
-              'reservation:id,user_id,chambre_id,date_debut,date_fin,statut,prix_total',
-            'reservation.user:id,nom,prenom',
-            'reservation.chambre:id,numero,type',
-            'lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
-        ])
-        ->paginate(12);
+            ->with([
+                'reservation:id,user_id,chambre_id,date_debut,date_fin,statut,prix_total',
+                'reservation.user:id,nom,prenom',
+                'reservation.chambre:id,numero,type',
+                'lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
+            ])
+            ->paginate(12);
     }
-    public function getUserFactures(User $user){
+    public function getUserFactures(User $user)
+    {
         return $user->reservation()
-        ->with([
-            'facture:id,reservation_id,numero,date_emission,montant_total,statut',
-            'facture.lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
-        
-        ])
-        ->get()
-        ->pluck('facture')
-        ->filter()
-        ->values();
+            ->with([
+                'facture:id,reservation_id,numero,date_emission,montant_total,statut',
+                'facture.lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
+
+            ])
+            ->get()
+            ->pluck('facture')
+            ->filter()
+            ->values();
     }
-    public function payefacture(Facture $facture){
-    if($facture->statut==StatutFacture::Payee){
-        throw ValidationException::withMessages(
-            ['message'=> 'cette facture est déja payée']
-        );
-    };
-        $facture->statut=StatutFacture::Payee;
+    public function payefacture(Facture $facture)
+    {
+        if ($facture->statut == StatutFacture::Payee) {
+            throw ValidationException::withMessages(
+                ['message' => 'cette facture est déja payée']
+            );
+        }
+        ;
+        $facture->statut = StatutFacture::Payee;
         $facture->save();
     }
-    public function addServicetoReservation(Reservation $reservation,User $user,array $data){
-    return DB::transaction(function () use ($reservation,$user,$data){
-        $reservation=Reservation::where('id',$reservation->id)
-        ->lockForUpdate()
-        ->firstOrFail();
-        if($reservation->user_id!=$user->id){
-            abort(403, 'Vous ne pouvez pas modifier cette réservation.');
-        };
-        if($reservation->statut===StatutReservation::Annulee){
-            throw ValidationException::withMessages([
-                'reservation' => 'Impossible d’ajouter des services à une réservation annulée.',
-            ]);
-        }
-        $facture=Facture::where('reservation_id',$reservation->id)
-        ->lockForUpdate()
-        ->firstOrFail();
-        if($facture->statut===StatutFacture::Payee){
-            throw ValidationException::withMessages([
-                'facture' => 'Cette facture est déjà payée.',
-            ]);
-        }
-        $prixServices = 0;
+    public function addServicetoReservation(Reservation $reservation, User $user, array $data)
+    {
+        return DB::transaction(function () use ($reservation, $user, $data) {
+            $reservation = Reservation::where('id', $reservation->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($reservation->user_id != $user->id) {
+                abort(403, 'Vous ne pouvez pas modifier cette réservation.');
+            };
+            if ($reservation->statut === StatutReservation::Annulee) {
+                throw ValidationException::withMessages([
+                    'reservation' => 'Impossible d’ajouter des services à une réservation annulée.',
+                ]);
+            }
+            $facture = Facture::where('reservation_id', $reservation->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($facture->statut === StatutFacture::Payee) {
+                throw ValidationException::withMessages([
+                    'facture' => 'Cette facture est déjà payée.',
+                ]);
+            }
+            $prixServices = 0;
 
             foreach ($data['services'] as $serviceData) {
 
@@ -346,58 +351,78 @@ class ReservationManagementService
 
                 $prixServices += $sousTotal;
             }
-            $facture->montant_total+=$prixServices;
+            $facture->montant_total += $prixServices;
             $facture->save();
-            $reservation->prix_total+=$prixServices;
+            $reservation->prix_total += $prixServices;
             $reservation->save();
             return $reservation->load([
-            'chambre',
-            'reservationServices.service',
-            'facture.lignesFacture',
-        ]);
-    });
-    }
-    public function CheckIn(Reservation $reservation){
-        return DB::transaction(function () use ($reservation){
-            $reservation=Reservation::where('id',$reservation->id)
-            ->lockForUpdate()
-            ->firstOrFail();
-                if($reservation->statut===StatutReservation::Annulee){
-                    throw ValidationException::withMessages(
-                        [
-                            'message'=>'cette reservation est déja annulée.'
-                        ]
-                    );
-                };
-                if($reservation->check_in!=null){
-                    throw ValidationException::withMessages([
-                        'message'=>'ce client déja fait le check In'
-                    ]);
-                }
-                if($reservation->date_debut>now()){
-                    throw ValidationException::withMessages([
-                        'message'=>'le temps de check in n\'est pas encore arrivé'
-                    ]);
-                }
-                $reservation->check_in=now();
-                $reservation->save();
+                'chambre',
+                'reservationServices.service',
+                'facture.lignesFacture',
+            ]);
         });
     }
-    public function CheckOut(Reservation $reservation){
-        $reservation=Reservation::where('id',$reservation->id)
+    public function CheckIn(Reservation $reservation)
+    {
+        return DB::transaction(function () use ($reservation) {
+            $reservation = Reservation::where('id', $reservation->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $chambre = Chambre::where('id', $reservation->chambre_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($reservation->statut === StatutReservation::Annulee) {
+                throw ValidationException::withMessages(
+                    [
+                        'message' => 'cette reservation est déja annulée.'
+                    ]
+                );
+            };
+            if ($reservation->check_in != null) {
+                throw ValidationException::withMessages([
+                    'message' => 'ce client déja fait le check In'
+                ]);
+            }
+            if ($reservation->date_debut > now()) {
+                throw ValidationException::withMessages([
+                    'message' => 'le temps de check in n\'est pas encore arrivé'
+                ]);
+            }
+            $reservation->check_in = now();
+            $reservation->statut = StatutReservation::EnCours;
+            $reservation->save();
+
+            $chambre->status = StatutChambre::Occupee;
+            $chambre->save();
+        });
+    }
+    public function CheckOut(Reservation $reservation)
+    {
+        $reservation = Reservation::where('id', $reservation->id)
             ->lockForUpdate()
             ->firstOrFail();
-            if($reservation->check_out!=null){
-                throw ValidationException::withMessages([
-                    'message'=>'ce client à déja fais le check out'
-                ]);
-            }
-            if($reservation->check_in===null){
-                throw ValidationException::withMessages([
-                    'message'=>'ce client n\'est pas encore fais le checkIn'
-                ]);
-            }
-            $reservation->check_out=now();
-            $reservation->save();
+        $chambre = Chambre::where('id', $reservation->chambre_id)
+            ->lockForUpdate()
+            ->firstOrFail();
+        if ($reservation->statut !== StatutReservation::EnCours) {
+            throw ValidationException::withMessages([
+                'reservation' => 'Cette réservation n’est pas en cours.',
+            ]);
+        }
+        if ($reservation->check_out != null) {
+            throw ValidationException::withMessages([
+                'message' => 'ce client à déja fais le check out'
+            ]);
+        }
+        if ($reservation->check_in === null) {
+            throw ValidationException::withMessages([
+                'message' => 'ce client n\'est pas encore fais le checkIn'
+            ]);
+        }
+        $reservation->check_out = now();
+        $reservation->save();
+
+        $chambre->status = StatutChambre::EnNettoyage;
+        $chambre->save();
     }
 }

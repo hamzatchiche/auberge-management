@@ -62,12 +62,22 @@ class AubergeManagement extends Controller
             'type' => ['sometimes', 'string', 'max:50'],
             'capacite' => ['sometimes', 'integer', 'min:1'],
             'prix_nuit' => ['sometimes', 'numeric', 'min:0'],
-            'status' => ['sometimes', Rule::enum(StatutChambre::class)],
         ]);
         $this->aubergeManagementService->updateChambre($chambre, $data);
         return response()->json([
             'message' => 'chambre mis à jour avec succès.'
         ], 200);
+    }
+    public function updateStatusChambre(Request $request, Chambre $chambre){
+        $data=$request->validate([
+            
+            'status' => ['required', Rule::enum(StatutChambre::class)]
+        ]);
+        $this->aubergeManagementService->updateStatusChambre($chambre,$data['status']);
+        return response()->json([
+            'message' => 'Statut de la chambre mis à jour.'
+    ]);
+
     }
     public function deleteChambre(Chambre $chambre)
     {
@@ -76,6 +86,7 @@ class AubergeManagement extends Controller
             'message' => 'chambre suprimmer avec succès .'
         ], 200);
     }
+    
     public function getAvailablechambres(Request $request): JsonResponse{
         $data=$request->validate([
             'date_debut' => ['required', 'date', 'after_or_equal:today'],
