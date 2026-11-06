@@ -1,11 +1,15 @@
 <?php
 
-use App\Http\Controllers\administration\AubergeManagement;
+use App\Http\Controllers\administration\AubergeInformation;
+use App\Http\Controllers\administration\RoomManagement;
+use App\Http\Controllers\administration\ServiceManagement;
 use App\Http\Controllers\administration\UserManagement;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\InvoiceManagement;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ReservationManagement;
+use App\Http\Controllers\StayManagement;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Attributes\Controllers\Middleware;
 use Illuminate\Support\Facades\Route;
@@ -27,10 +31,10 @@ Route::post('/auth/reset-password', [
     PasswordResetController::class,
     'reset',
 ])->middleware('throttle:6,1');
-Route::get('/auberge', [AubergeManagement::class, 'getAubergeInfos']);
-Route::get('/chambres', [AubergeManagement::class, 'getChambres']);
-Route::get('/availableChambres', [AubergeManagement::class, 'getAvailablechambres']);
-Route::get('/services', [AubergeManagement::class, 'getServices']);
+Route::get('/auberge', [AubergeInformation::class, 'getAubergeInfos']);
+Route::get('/chambres', [RoomManagement::class, 'getChambres']);
+Route::get('/availableChambres', [RoomManagement::class, 'getAvailablechambres']);
+Route::get('/services', [ServiceManagement::class, 'getServices']);
 
 
 
@@ -45,7 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/reservations/{reservation}/cancel', [ReservationManagement::class, 'cancelReservation']);
     Route::get('/me/reservations', [ReservationManagement::class, 'getUserReservations']);
     Route::get('/me/reservations/{reservationId}', [ReservationManagement::class, 'getUserReservationById']);
-    Route::get('/me/factures',[ReservationManagement::class, 'getUserFactures']);
+    Route::get('/me/factures',[InvoiceManagement::class, 'getUserFactures']);
     Route::patch('/reservations/{reservation}/services',[ReservationManagement::class, 'addServiceToReservation']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 });
@@ -55,21 +59,23 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/administration/createReceptionniste', [UserManagement::class, 'createReceptionniste']);
     Route::delete('/administration/receptionniste', [UserManagement::class, 'removeReceptionniste']);
     Route::get('/administration/AllUsers', [UserManagement::class, 'getAllUsers']);
-    Route::patch('/auberge/{auberge}', [AubergeManagement::class, 'updateAubergeInfo']);
+    Route::patch('/auberge/{auberge}', [AubergeInformation::class, 'updateAubergeInfo']);
 });
 
 // routes for reception
 Route::middleware(['auth:sanctum', 'role:receptionniste'])->group(function () {
-    Route::post('/chambre', [AubergeManagement::class, 'createChambre']);
-    Route::patch('/chambre/{chambre}', [AubergeManagement::class, 'updateChambre']);
-    Route::patch('/chambre/{chambre}/status', [AubergeManagement::class, 'updateStatusChambre']);
-    Route::delete('/chambre/{chambre}', [AubergeManagement::class, 'deleteChambre']);
-    Route::get('/factures', [ReservationManagement::class, 'getFactures']);
-    Route::post('/facture/{facture}', [ReservationManagement::class, 'payefacture']);
-    Route::post('/reservation/{reservation}/CheckIn', [ReservationManagement::class, 'CheckIn']);
-    Route::post('/reservation/{reservation}/CheckOut', [ReservationManagement::class, 'CheckOut']);
+    Route::post('/chambre', [RoomManagement::class, 'createChambre']);
+    Route::patch('/chambre/{chambre}', [RoomManagement::class, 'updateChambre']);
+    Route::patch('/chambre/{chambre}/status', [RoomManagement::class, 'updateStatusChambre']);
+    Route::delete('/chambre/{chambre}', [RoomManagement::class, 'deleteChambre']);
+    Route::get('/factures', [InvoiceManagement::class, 'getFactures']);
+    Route::post('/facture/{facture}', [InvoiceManagement::class, 'payefacture']);
+    Route::post('/reservation/{reservation}/CheckIn', [StayManagement::class, 'CheckIn']);
+    Route::get('/reservations/CheckIn', [StayManagement::class, 'getCheckIntoday']);
+    Route::post('/reservation/{reservation}/CheckOut', [StayManagement::class, 'CheckOut']);
+    Route::get('/reservations/CheckOut', [StayManagement::class, 'getCheckOuttoday']);
     // services
-    Route::post('/service', [AubergeManagement::class, 'addService']);
-    Route::patch('/service/{service}', [AubergeManagement::class, 'updateService']);
-    Route::delete('/service/{service}', [AubergeManagement::class, 'deleteService']);
+    Route::post('/service', [ServiceManagement::class, 'addService']);
+    Route::patch('/service/{service}', [ServiceManagement::class, 'updateService']);
+    Route::delete('/service/{service}', [ServiceManagement::class, 'deleteService']);
 });

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Chambre;
-use App\Models\Facture;
 use App\Models\Reservation;
 use App\Services\ReservationManagementService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -104,24 +103,6 @@ class ReservationManagement extends Controller
             'message' => 'Réservation annulée avec succès.'
         ]);
     }
-    public function getFactures(){
-        $factures= $this->reservationService->getFactures();
-        return response()->json([
-            'factures'=>$factures,
-        ]);
-    }
-    public function getUserFactures(Request $request){
-        $factures=$this->reservationService->getUserFactures($request->user());
-        return response()->json([
-            'factures'=>$factures
-        ]);
-    }
-    public function payefacture(Facture $facture):JsonResponse{
-        $this->reservationService->payefacture($facture);
-        return response()->json([
-            'mesage'=>'facture payée avec succès'
-        ]);
-    }
     public function addServicetoReservation( Request $request,
     Reservation $reservation):JsonResponse{
          $data = $request->validate([
@@ -174,18 +155,6 @@ class ReservationManagement extends Controller
         );
     return response()->json([
         'message' => 'Les services ont été ajoutés à la réservation.'
-    ]);
-    }
-    public function CheckIn(Reservation $reservation):JsonResponse{
-        $reservation=$this->reservationService->CheckIn($reservation);
-         return response()->json([
-            'message'=>'check In fait avec succès'
-        ]);
-    }
-    public function CheckOut(Reservation $reservation):JsonResponse{
-    $this->reservationService->CheckOut($reservation);
-    return response()->json([
-        'message'=>'check out fait avec succès',
     ]);
     }
 }
