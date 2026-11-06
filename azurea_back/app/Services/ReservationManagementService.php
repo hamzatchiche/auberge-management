@@ -14,7 +14,9 @@ use App\Models\Service;
 use App\Models\User;
 use Carbon\Carbon;
 use DB;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+
 
 class ReservationManagementService
 {
@@ -202,7 +204,7 @@ class ReservationManagementService
                 'user:id,nom,prenom',
                 'chambre:id,numero,type,prix_nuit'
             ])
-            ->paginate(12);
+            ->paginate(5);
     }
     public function getUserReservationById(User $user, int $reservationId)
     {
@@ -323,4 +325,51 @@ class ReservationManagementService
             ]);
         });
     }
+    public function getAllReservations(array $filters){
+        return Reservation::query()
+            ->select([
+                'id',
+                'user_id',
+                'chambre_id',
+                'date_debut',
+                'date_fin',
+                'nombre_adultes',
+                'nombre_enfants',
+                'statut',
+                'prix_total',
+            ])
+         ->with([
+            'user:id,nom,prenom',
+            'chambre:id,numero,type',
+        ])
+        ->when(isset($filters['dateDebut']), function ($query) use ($filters){
+            $query->whereDate('date_debut', $filters['dateDebut']);
+        })
+        ->when(isset($filters['dateFin']), function ($query) use ($filters) {
+            $query->whereDate('date_fin', $filters['dateFin']);
+        })
+
+        ->when(isset($filters['statut']), function ($query) use ($filters) {
+            $query->where('statut', $filters['statut']);
+        })
+        ->when(isset($filters['client']), function ($query) use ($filters) {
+            $client=$filters['client'];
+            $query->whereHas('user',function ($q) use ($client){
+                $q->where('nom', 'like', "%{$client}%")
+                    ->orWhere('prenom', 'like', "%{$client}%")
+                    ->orWhere('email', 'like', "%{$client}%");
+            });
+        })
+        ->when(isset($filters['numero']), function ($query) use ($filters) {
+            $numero = $filters['numero'];
+
+            $query->whereHas('chambre', function ($q) use ($numero) {
+                $q->where('numero', '=', "$numero");
+            });
+        })
+        ->latest()
+        ->paginate(10);
+            ;
+    }
+
 }

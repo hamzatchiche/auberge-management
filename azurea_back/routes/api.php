@@ -74,6 +74,7 @@ Route::middleware(['auth:sanctum', 'role:receptionniste'])->group(function () {
     Route::get('/reservations/CheckIn', [StayManagement::class, 'getCheckIntoday']);
     Route::post('/reservation/{reservation}/CheckOut', [StayManagement::class, 'CheckOut']);
     Route::get('/reservations/CheckOut', [StayManagement::class, 'getCheckOuttoday']);
+    Route::get('/reservations', [ReservationManagement::class, 'getAllReservations']);
     // services
     Route::post('/service', [ServiceManagement::class, 'addService']);
     Route::patch('/service/{service}', [ServiceManagement::class, 'updateService']);

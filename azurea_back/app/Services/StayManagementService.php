@@ -75,9 +75,9 @@ class StayManagementService
         $chambre = Chambre::where('id', $reservation->chambre_id)
             ->lockForUpdate()
             ->firstOrFail();
-        if ($reservation->statut !== StatutReservation::EnCours) {
+        if ($reservation->check_in === null) {
             throw ValidationException::withMessages([
-                'reservation' => 'Cette réservation n’est pas en cours.',
+                'message' => 'ce client n\'est pas encore fais le checkIn'
             ]);
         }
         if ($reservation->check_out != null) {
@@ -85,11 +85,12 @@ class StayManagementService
                 'message' => 'ce client à déja fais le check out'
             ]);
         }
-        if ($reservation->check_in === null) {
+        if ($reservation->statut !== StatutReservation::EnCours) {
             throw ValidationException::withMessages([
-                'message' => 'ce client n\'est pas encore fais le checkIn'
+                'reservation' => 'Cette réservation n’est pas en cours.',
             ]);
         }
+
         $reservation->check_out = now();
         $reservation->statut = StatutReservation::Terminee;
         $reservation->save();

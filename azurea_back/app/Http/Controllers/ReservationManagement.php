@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\StatutReservation;
 use App\Models\Chambre;
 use App\Models\Reservation;
 use App\Services\ReservationManagementService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Mail;
 
 class ReservationManagement extends Controller
@@ -26,11 +28,7 @@ class ReservationManagement extends Controller
 
             'services' => ['sometimes', 'array'],
             'services.*.service_id' => ['required', 'integer', 'distinct', 'exists:services,id'],
-            'services.*.quantite' => [
-                'required',
-                'integer',
-                'min:1',
-            ],
+            'services.*.quantite' => ['required','integer', 'min:1']
         ]);
         $reservation = $this->reservationService->createreservation($chambre, $request->user(), $data);
         $reservation->load([
@@ -157,4 +155,27 @@ class ReservationManagement extends Controller
         'message' => 'Les services ont été ajoutés à la réservation.'
     ]);
     }
+    public function getAllReservations(Request $request){
+        $filters = $request->validate([
+        'dateDebut' => ['sometimes', 'nullable', 'date'],
+        'dateFin' => ['sometimes', 'nullable', 'date', 'after_or_equal:dateDebut'],
+
+        'statut' => [
+            'sometimes',
+            'nullable',
+            Rule::enum(StatutReservation::class),
+        ],
+
+        'client' => ['sometimes', 'nullable', 'string', 'max:100'],
+
+        'numero' => ['sometimes', 'nullable', 'string', 'max:20'],
+    ]);
+
+        $reservation=$this->reservationService->getAllReservations($filters);
+        return response()->json([
+            'reservation'=>$reservation
+        ]);
+    }
+
+
 }
