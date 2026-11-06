@@ -68,14 +68,7 @@ class AuthController extends Controller
         'nom' => ['sometimes', 'required', 'string', 'max:20'],
         'prenom' => ['sometimes', 'required', 'string', 'max:20'],
         'genre' => ['sometimes', 'required', new EnumRule(Genre::class)],
-        'email' => [
-            'sometimes',
-            'required',
-            'email',
-            'max:255',
-            'unique:users,email,' . $user->id,
-        ],
-    ]);
+            ]);
     $this->authService->updateProfile($user,$data);
     return response()->json([
         'message'=>'Profil mis à jour avec succès.',

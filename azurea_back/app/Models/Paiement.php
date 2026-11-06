@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\Enums\ModePaiement;
+use App\Enums\ModePaiement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

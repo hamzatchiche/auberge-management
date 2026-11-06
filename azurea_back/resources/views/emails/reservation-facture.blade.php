@@ -62,15 +62,27 @@
 
     <div class="header">
         <h1>Azuveria</h1>
-        <p>Confirmation de réservation et facture</p>
+        @if (isset($paiement))
+            <p>Facture acquittée — confirmation de paiement</p>
+        @else
+            <p>Confirmation de réservation et facture</p>
+        @endif
     </div>
 
     <p>Bonjour {{ $user->prenom }} {{ $user->nom }},</p>
 
-    <p>
-        Votre réservation chez Azuveria a été confirmée avec succès.
-        Vous trouverez ci-dessous les détails de votre réservation et votre facture.
-    </p>
+    @if (isset($paiement))
+        <p>
+            Nous confirmons la réception de votre paiement de
+            {{ number_format((float) $paiement->montant, 2) }} DH.
+            Vous trouverez votre facture acquittée en pièce jointe.
+        </p>
+    @else
+        <p>
+            Votre réservation chez Azuveria a été confirmée avec succès.
+            Vous trouverez ci-dessous les détails de votre réservation et votre facture.
+        </p>
+    @endif
 
     <div class="section-title">
         Informations de réservation
@@ -154,6 +166,13 @@
         Statut de la facture :
         {{ $reservation->facture->statut->value }}
     </p>
+
+    @if (isset($paiement))
+        <p>
+            Paiement reçu le {{ $paiement->date_paiement->format('d/m/Y à H:i') }}
+            par {{ $paiement->mode_paiement->value }}.
+        </p>
+    @endif
 
     <div class="footer">
         <p>Merci d'avoir choisi Azuveria.</p>

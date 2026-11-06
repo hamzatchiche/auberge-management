@@ -28,7 +28,7 @@ class ReservationManagement extends Controller
 
             'services' => ['sometimes', 'array'],
             'services.*.service_id' => ['required', 'integer', 'distinct', 'exists:services,id'],
-            'services.*.quantite' => ['required','integer', 'min:1']
+            'services.*.quantite' => ['required', 'integer', 'min:1']
         ]);
         $reservation = $this->reservationService->createreservation($chambre, $request->user(), $data);
         $reservation->load([
@@ -66,6 +66,7 @@ class ReservationManagement extends Controller
             'reservation' => $reservation,
         ], 201);
     }
+    // user 
     public function getUserReservations(Request $request): JsonResponse
     {
         $reservations = $this->reservationService->getUserReservations($request->user());
@@ -74,20 +75,35 @@ class ReservationManagement extends Controller
         ]);
     }
     public function getUserReservationById(
-    Request $request,
-    int $reservationId
-): JsonResponse {
+        Request $request,
+        int $reservationId
+    ): JsonResponse {
 
-    $reservation = $this->reservationService
-        ->getUserReservationById(
-            $request->user(),
-            $reservationId
-        );
+        $reservation = $this->reservationService
+            ->getUserReservation(
+                $request->user(),
+                $reservationId
+            );
 
-    return response()->json([
-        'reservation' => $reservation,
-    ]);
-}
+        return response()->json([
+            'reservation' => $reservation,
+        ]);
+    }
+    public function getReservationById(
+        Request $request,
+        Reservation $reservation
+    ): JsonResponse {
+
+        $reservation = $this->reservationService
+            ->getReservationById(
+                $request->user(),
+                $reservation
+            );
+
+        return response()->json([
+            'reservation' => $reservation,
+        ]);
+    }
     public function cancelReservation(
         Reservation $reservation,
         Request $request
@@ -101,33 +117,39 @@ class ReservationManagement extends Controller
             'message' => 'Réservation annulée avec succès.'
         ]);
     }
-    public function addServicetoReservation( Request $request,
-    Reservation $reservation):JsonResponse{
-         $data = $request->validate([
-        'services' => ['required', 'array', 'min:1'],
+    public function addServicetoReservation(
+        Request $request,
+        Reservation $reservation
+    ): JsonResponse {
+        $data = $request->validate([
+            'services' => ['required', 'array', 'min:1'],
 
-        'services.*.service_id' => [
-            'required',
-            'integer',
-            'distinct',
-            'exists:services,id',
-        ],
+            'services.*.service_id' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:services,id',
+            ],
 
-        'services.*.quantite' => [
-            'required',
-            'integer',
-            'min:1',
-        ],
-    ]);
-    $reservationupdated=$this->reservationService->addServicetoReservation($reservation
-    ,$request->user(),$data);
-    $reservation->load([
+            'services.*.quantite' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+        ]);
+        $reservationupdated = $this->reservationService->addServicetoReservation(
+            $reservation
+            ,
+            $request->user(),
+            $data
+        );
+        $reservation->load([
             'user',
             'chambre',
             'reservationServices.service',
             'facture.lignesFacture',
         ]);
-    $pdf = Pdf::loadView('emails.reservation-facture', [
+        $pdf = Pdf::loadView('emails.reservation-facture', [
             'user' => $request->user(),
             'reservation' => $reservation,
         ]);
@@ -151,29 +173,30 @@ class ReservationManagement extends Controller
                     );
             }
         );
-    return response()->json([
-        'message' => 'Les services ont été ajoutés à la réservation.'
-    ]);
-    }
-    public function getAllReservations(Request $request){
-        $filters = $request->validate([
-        'dateDebut' => ['sometimes', 'nullable', 'date'],
-        'dateFin' => ['sometimes', 'nullable', 'date', 'after_or_equal:dateDebut'],
-
-        'statut' => [
-            'sometimes',
-            'nullable',
-            Rule::enum(StatutReservation::class),
-        ],
-
-        'client' => ['sometimes', 'nullable', 'string', 'max:100'],
-
-        'numero' => ['sometimes', 'nullable', 'string', 'max:20'],
-    ]);
-
-        $reservation=$this->reservationService->getAllReservations($filters);
         return response()->json([
-            'reservation'=>$reservation
+            'message' => 'Les services ont été ajoutés à la réservation.'
+        ]);
+    }
+    public function getAllReservations(Request $request)
+    {
+        $filters = $request->validate([
+            'dateDebut' => ['sometimes', 'nullable', 'date'],
+            'dateFin' => ['sometimes', 'nullable', 'date', 'after_or_equal:dateDebut'],
+
+            'statut' => [
+                'sometimes',
+                'nullable',
+                Rule::enum(StatutReservation::class),
+            ],
+
+            'client' => ['sometimes', 'nullable', 'string', 'max:100'],
+
+            'numero' => ['sometimes', 'nullable', 'string', 'max:20'],
+        ]);
+
+        $reservation = $this->reservationService->getAllReservations($filters);
+        return response()->json([
+            'reservation' => $reservation
         ]);
     }
 

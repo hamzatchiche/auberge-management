@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReservation;
 use App\Models\Facture;
+use App\Models\Paiement;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class InvoiceManagementService
@@ -39,13 +42,69 @@ class InvoiceManagementService
 
     public function payefacture(Facture $facture)
     {
-        if ($facture->statut == StatutFacture::Payee) {
-            throw ValidationException::withMessages(
-                ['message' => 'cette facture est déja payée']
-            );
+        return DB::transaction(function () use ($facture) {
+            $facture = Facture::query()
+                ->lockForUpdate()
+                ->findOrFail($facture->id);
+
+            if ($facture->statut === StatutFacture::Payee) {
+                throw ValidationException::withMessages([
+                    'message' => 'Cette facture est déjà payée.',
+                ]);
+            }
+
+            $montant = (float) $facture->montant_total;
+
+            if ($montant <= 0) {
+                throw ValidationException::withMessages([
+                    'facture' => 'Le montant de la facture doit être supérieur à zéro.',
+                ]);
+            }
+
+            $facture->paiement()->create([
+                'date_paiement' => now(),
+                'montant' => $montant,
+                'mode_paiement' => ModePaiement::Especes->value,
+            ]);
+
+            $facture->statut = StatutFacture::Payee;
+            $facture->save();
+
+            return $this->loadPaymentReceiptRelations($facture);
+        }, attempts: 3);
+    }
+
+    public function getPaidInvoiceReceipt(Facture $facture): Facture
+    {
+        $facture = Facture::query()
+            ->with($this->paymentReceiptRelations())
+            ->findOrFail($facture->id);
+
+        if (
+            $facture->statut !== StatutFacture::Payee
+            || $facture->paiement->isEmpty()
+        ) {
+            throw ValidationException::withMessages([
+                'facture' => 'Aucun paiement confirmé n’est disponible pour cette facture.',
+            ]);
         }
-        ;
-        $facture->statut = StatutFacture::Payee;
-        $facture->save();
+
+        return $facture;
+    }
+
+    private function loadPaymentReceiptRelations(Facture $facture): Facture
+    {
+        return $facture->load($this->paymentReceiptRelations());
+    }
+
+    private function paymentReceiptRelations(): array
+    {
+        return [
+            'reservation.user:id,nom,prenom,email',
+            'reservation.chambre:id,numero,type',
+            'reservation.reservationServices.service',
+            'lignesFacture',
+            'paiement',
+        ];
     }
 }
