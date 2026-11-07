@@ -71,7 +71,7 @@ Route::middleware(['auth:sanctum', 'role:receptionniste'])->group(function () {
     Route::delete('/chambre/{chambre}', [RoomManagement::class, 'deleteChambre']);
     Route::get('/factures', [InvoiceManagement::class, 'getFactures']);
     Route::post('/facture/{facture}', [InvoiceManagement::class, 'payefacture']);
-    Route::post('/facture/{facture}/confirmation', [InvoiceManagement::class, 'resendPaymentConfirmation']);
+    Route::post('/facture/{facture}/resend-confirmation', [InvoiceManagement::class, 'resendPaymentConfirmation']);
     Route::post('/reservation/{reservation}/CheckIn', [StayManagement::class, 'CheckIn']);
     Route::get('/reservations/CheckIn', [StayManagement::class, 'getCheckIntoday']);
     Route::post('/reservation/{reservation}/CheckOut', [StayManagement::class, 'CheckOut']);

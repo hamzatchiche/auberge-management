@@ -30,6 +30,7 @@ class InvoiceManagementService
     public function getUserFactures(User $user)
     {
         return $user->reservation()
+        
             ->with([
                 'facture:id,reservation_id,numero,date_emission,montant_total,statut',
                 'facture.lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',

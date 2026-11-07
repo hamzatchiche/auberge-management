@@ -69,20 +69,7 @@
         @endif
     </div>
 
-    <p>Bonjour {{ $user->prenom }} {{ $user->nom }},</p>
-
-    @if (isset($paiement))
-        <p>
-            Nous confirmons la réception de votre paiement de
-            {{ number_format((float) $paiement->montant, 2) }} DH.
-            Vous trouverez votre facture acquittée en pièce jointe.
-        </p>
-    @else
-        <p>
-            Votre réservation chez Azuveria a été confirmée avec succès.
-            Vous trouverez ci-dessous les détails de votre réservation et votre facture.
-        </p>
-    @endif
+    <p>{{ $user->prenom }} {{ $user->nom }},</p>
 
     <div class="section-title">
         Informations de réservation
