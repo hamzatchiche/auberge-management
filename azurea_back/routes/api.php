@@ -10,8 +10,6 @@ use App\Http\Controllers\InvoiceManagement;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ReservationManagement;
 use App\Http\Controllers\StayManagement;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Attributes\Controllers\Middleware;
 use Illuminate\Support\Facades\Route;
 
 
@@ -20,20 +18,20 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/register', [AuthController::class, 'register'])
     ->middleware('throttle:5,1');
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
-    ->Middleware(['signed', 'throttle:6,1'])
+    ->Middleware(['signed', 'throttle:4,1'])
     ->name('verification.verify');
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:4,1');
 Route::post('/auth/forgot-password', [
     PasswordResetController::class,
     'forgot',
-])->middleware('throttle:6,1');
+])->middleware('throttle:2,1');
 Route::post('/auth/reset-password', [
     PasswordResetController::class,
     'reset',
-])->middleware('throttle:6,1');
+])->middleware('throttle:3,1');
 Route::get('/auberge', [AubergeInformation::class, 'getAubergeInfos']);
 Route::get('/chambres', [RoomManagement::class, 'getChambres']);
-Route::get('/availableChambres', [RoomManagement::class, 'getAvailablechambres']);
+Route::get('/availablechambres', [RoomManagement::class, 'getAvailablechambres']);
 Route::get('/services', [ServiceManagement::class, 'getServices']);
 
 
@@ -71,7 +69,7 @@ Route::middleware(['auth:sanctum', 'role:receptionniste'])->group(function () {
     Route::delete('/chambre/{chambre}', [RoomManagement::class, 'deleteChambre']);
     Route::get('/factures', [InvoiceManagement::class, 'getFactures']);
     Route::post('/facture/{facture}', [InvoiceManagement::class, 'payefacture']);
-    Route::post('/facture/{facture}/resend-confirmation', [InvoiceManagement::class, 'resendPaymentConfirmation']);
+    Route::post('/facture/{facture}/confirmation', [InvoiceManagement::class, 'resendPaymentConfirmation']);
     Route::post('/reservation/{reservation}/CheckIn', [StayManagement::class, 'CheckIn']);
     Route::get('/reservations/CheckIn', [StayManagement::class, 'getCheckIntoday']);
     Route::post('/reservation/{reservation}/CheckOut', [StayManagement::class, 'CheckOut']);

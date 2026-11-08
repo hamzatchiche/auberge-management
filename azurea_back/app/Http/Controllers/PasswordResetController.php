@@ -63,7 +63,7 @@ class PasswordResetController extends Controller
                 ) {
                     $user->email_verified_at = now();
                 }
-
+                
                 $user->save();
 
                 $user->tokens()->delete();
@@ -71,7 +71,11 @@ class PasswordResetController extends Controller
                 $resetUser = $user;
             }
         );
-
+        if($status!==Password::PASSWORD_RESET){
+            return response()->json([
+                'message'=> 'Le lien de réinitialisation est invalide ou expiré.'
+            ],422);
+        }
         Mail::send(
             'emails.password-changed',
             ['user' => $resetUser],
