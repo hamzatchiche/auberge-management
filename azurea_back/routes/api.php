@@ -50,7 +50,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me/factures',[InvoiceManagement::class, 'getUserFactures']);
     Route::patch('/reservations/{reservation}/services',[ReservationManagement::class, 'addServiceToReservation']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/reservation/{reservation}', [ReservationManagement::class, 'getReservationById']);
     });
 
 // route for admin
@@ -75,6 +74,7 @@ Route::middleware(['auth:sanctum', 'role:receptionniste'])->group(function () {
     Route::post('/reservation/{reservation}/CheckOut', [StayManagement::class, 'CheckOut']);
     Route::get('/reservations/CheckOut', [StayManagement::class, 'getCheckOuttoday']);
     Route::get('/reservations', [ReservationManagement::class, 'getAllReservations']);
+    Route::get('/reservation/{reservation}', [ReservationManagement::class, 'getReservationById']);
     // services
     Route::post('/service', [ServiceManagement::class, 'addService']);
     Route::patch('/service/{service}', [ServiceManagement::class, 'updateService']);

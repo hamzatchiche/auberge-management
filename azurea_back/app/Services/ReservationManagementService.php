@@ -207,14 +207,8 @@ class ReservationManagementService
             ])
             ->paginate(5);
     }
-    public function getReservationById(User $user,Reservation $reservation)
+    public function getReservationById(Reservation $reservation)
     {
-        if (
-        $user->role !== Role::Receptionniste &&
-        $reservation->user_id !== $user->id
-    ) {
-        abort(403, 'You are not authorized to access this reservation.');
-    }
        return $reservation->load([
         'user:id,nom,prenom',
         'chambre:id,numero,type,prix_nuit',

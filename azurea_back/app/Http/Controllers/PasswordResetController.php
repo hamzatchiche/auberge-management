@@ -33,7 +33,7 @@ class PasswordResetController extends Controller
             ], 429);
         }
         return response()->json([
-            'message' => 'un lien de réinitialisation sera envoyé.'
+            'message' => 'un lien de réinitialisation était envoyé.'
         ]);
     }
     public function reset(Request $request): JsonResponse

@@ -96,7 +96,6 @@ class ReservationManagement extends Controller
 
         $reservation = $this->reservationService
             ->getReservationById(
-                $request->user(),
                 $reservation
             );
 
