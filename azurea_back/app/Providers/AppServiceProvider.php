@@ -30,7 +30,7 @@ class AppServiceProvider extends ServiceProvider
                 config('app.frontend_url'),
                 '/'
             );
-            return $frontendUrl.'/reset-password?token='
+            return $frontendUrl.'/reinitialiser-mot-de-passe?token='
             .urlencode($token)
             .'&email='
             .urlencode($user->getEmailForPasswordReset());

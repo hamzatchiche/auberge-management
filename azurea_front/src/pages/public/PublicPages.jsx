@@ -741,10 +741,7 @@ function AuthPage({ mode }) {
         prenom: String(form.get('prenom')).trim(),
         nom: String(form.get('nom')).trim(),
         genre: form.get('genre') || '',
-        email,
-        role: 'CLIENT',
-        active: true,
-        tel: '',
+        email
       };
       saveEntity('users', [...data.users, user]);
       localStorage.setItem('auberge-session', JSON.stringify(user));
