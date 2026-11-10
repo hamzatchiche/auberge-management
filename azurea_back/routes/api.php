@@ -57,6 +57,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/administration/createReceptionniste', [UserManagement::class, 'createReceptionniste']);
     Route::delete('/administration/receptionniste', [UserManagement::class, 'removeReceptionniste']);
     Route::get('/administration/AllUsers', [UserManagement::class, 'getAllUsers']);
+    Route::get('/administration/reservations', [ReservationManagement::class, 'getAllReservations']);
+    Route::get('/administration/factures', [InvoiceManagement::class, 'getFactures']);
     Route::patch('/auberge/{auberge}', [AubergeInformation::class, 'updateAubergeInfo']);
 });
 

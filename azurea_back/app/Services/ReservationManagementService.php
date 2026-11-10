@@ -198,11 +198,14 @@ class ReservationManagementService
                 'chambre_id',
                 'date_debut',
                 'date_fin',
+                'created_at',
+                'nombre_adultes',
+                'nombre_enfants',
                 'statut',
                 'prix_total',
             ])
             ->with([
-                'user:id,nom,prenom',
+                'user:id,nom,prenom,email',
                 'chambre:id,numero,type,prix_nuit'
             ])
             ->paginate(5);
@@ -228,13 +231,14 @@ class ReservationManagementService
                 'chambre_id',
                 'date_debut',
                 'date_fin',
+                'created_at',
                 'nombre_adultes',
                 'nombre_enfants',
                 'statut',
                 'prix_total',
             ])
             ->with([
-                'user:id,nom,prenom',
+                'user:id,nom,prenom,email',
                 'chambre:id,numero,type,prix_nuit',
                 'reservationServices:id,reservation_id,service_id,quantite,prix_unitaire_applique',
                 'reservationServices.service:id,nom,description,prix_unitaire',
@@ -346,13 +350,14 @@ class ReservationManagementService
                 'chambre_id',
                 'date_debut',
                 'date_fin',
+                'created_at',
                 'nombre_adultes',
                 'nombre_enfants',
                 'statut',
                 'prix_total',
             ])
          ->with([
-            'user:id,nom,prenom',
+            'user:id,nom,prenom,email',
             'chambre:id,numero,type',
         ])
         ->when(isset($filters['dateDebut']), function ($query) use ($filters){

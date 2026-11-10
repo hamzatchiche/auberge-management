@@ -1,5 +1,7 @@
 .hero{background-image:linear-gradient(90deg,#172642dd 0%,#17264296 48%,#17264208 100%),url('/dar-selene-hero.jpg')}
 .auth-photo{background-image:linear-gradient(#18284452,#18284470),url('/dar-selene-hero.jpg')}
 .search-box{grid-template-columns:repeat(4,minmax(0,1fr)) auto}
+.property-gallery{grid-template-columns:2fr 1fr 1fr;height:230px}
+@media(max-width:620px){.property-gallery{grid-template-columns:1fr;height:auto;grid-auto-rows:180px}}
 @media(max-width:900px){.search-box{grid-template-columns:repeat(2,minmax(0,1fr))}.search-box .btn{grid-column:span 2}}
 @media(max-width:620px){.search-box{grid-template-columns:repeat(2,minmax(0,1fr))}.search-box .btn{grid-column:span 2}}

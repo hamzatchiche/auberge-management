@@ -20,9 +20,10 @@ class InvoiceManagementService
         })
             ->with([
                 'reservation:id,user_id,chambre_id,date_debut,date_fin,statut,prix_total',
-                'reservation.user:id,nom,prenom',
-                'reservation.chambre:id,numero,type',
+                'reservation.user:id,nom,prenom,email',
+                'reservation.chambre:id,numero,type,prix_nuit',
                 'lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
+                'paiement:id,facture_id,date_paiement,montant,mode_paiement',
             ])
             ->paginate(12);
     }
@@ -34,6 +35,7 @@ class InvoiceManagementService
             ->with([
                 'facture:id,reservation_id,numero,date_emission,montant_total,statut',
                 'facture.lignesFacture:id,facture_id,description,quantite,prix_unitaire,sous_total',
+                'facture.paiement:id,facture_id,date_paiement,montant,mode_paiement',
             ])
             ->get()
             ->pluck('facture')

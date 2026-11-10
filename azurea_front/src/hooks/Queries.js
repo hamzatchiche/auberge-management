@@ -2,13 +2,13 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AubergeAPI, RoomsAPI, ServicesAPI, ReservationsAPI,
-  InvoicesAPI, UsersAPI, ProfileAPI,
+  InvoicesAPI, UsersAPI, ProfileAPI, apiGetAll,
 } from "../services/api";
 import { getStoredUser } from "../services/auth";
 import {
   list, one, toRoom, toService, toAuberge,
   toReservation, toInvoice, toUser,
-} from "../lib/normalize";
+} from "../lib/Normalize";
 
 /* ───────── LECTURES (useQuery) ───────── */
 
@@ -22,22 +22,39 @@ export const useAuberge = () =>
 export const useRooms = () =>
   useQuery({
     queryKey: ["rooms"],
-    queryFn: async () => list(await RoomsAPI.list()).map(toRoom),
+    queryFn: async () => (await apiGetAll("/chambres")).map(toRoom),
   });
 
 export const useServices = () =>
   useQuery({
     queryKey: ["services"],
-    queryFn: async () => list(await ServicesAPI.list()).map(toService),
+    queryFn: async () => (await apiGetAll("/services")).map(toService),
   });
 
 // ids des chambres libres entre 2 dates
-export const useAvailableRoomIds = (from, to, enabled) =>
+export const useAvailableRoomIds = (from, to, adults, children, enabled) =>
   useQuery({
-    queryKey: ["rooms", "available", from, to],
+    queryKey: ["rooms", "available", from, to, adults, children],
     enabled: Boolean(enabled),
     queryFn: async () =>
-      list(await RoomsAPI.available({ date_debut: from, date_fin: to })).map((r) => r.id),
+      list(await RoomsAPI.available({
+        date_debut: from,
+        date_fin: to,
+        nombre_adultes: adults,
+        nombre_enfants: children,
+      }), "chambres").map((r) => String(r.id)),
+  });
+
+export const useReservationDetail = (id, role, enabled) =>
+  useQuery({
+    queryKey: ["reservation-detail", role, id],
+    enabled: Boolean(enabled && id && role),
+    queryFn: async () => {
+      const response = role === "CLIENT"
+        ? await ReservationsAPI.mineById(id)
+        : await ReservationsAPI.byId(id);
+      return toReservation(response?.reservation ?? response);
+    },
   });
 
 /**
@@ -45,7 +62,7 @@ export const useAvailableRoomIds = (from, to, enabled) =>
  * { rooms, services, auberge, reservations, invoices, payments, users }
  * → les pages existantes continuent de marcher. Selon le rôle de la session :
  *   CLIENT → /me/reservations + /me/factures
- *   RECEPTIONNISTE / ADMIN → /reservations + /factures
+ *   RECEPTIONNISTE → /reservations + /factures
  *   ADMIN → + /administration/AllUsers
  */
 export function useData() {
@@ -62,9 +79,13 @@ export function useData() {
     enabled: Boolean(role),
     retry: false,
     queryFn: async () =>
-      list(role === "CLIENT" ? await ReservationsAPI.mine() : await ReservationsAPI.all()).map(
-        toReservation,
-      ),
+      (role === "CLIENT"
+        ? await apiGetAll("/me/reservations", "reservations")
+        : await apiGetAll(
+            role === "ADMIN" ? "/administration/reservations" : "/reservations",
+            "reservation",
+          )
+      ).map(toReservation),
   });
 
   const invoicesQ = useQuery({
@@ -72,14 +93,20 @@ export function useData() {
     enabled: Boolean(role),
     retry: false,
     queryFn: async () =>
-      list(role === "CLIENT" ? await InvoicesAPI.mine() : await InvoicesAPI.all()).map(toInvoice),
+      (role === "CLIENT"
+        ? await apiGetAll("/me/factures", "factures")
+        : await apiGetAll(
+            role === "ADMIN" ? "/administration/factures" : "/factures",
+            "factures",
+          )
+      ).map(toInvoice),
   });
 
   const usersQ = useQuery({
     queryKey: ["users"],
     enabled: role === "ADMIN",
     retry: false,
-    queryFn: async () => list(await UsersAPI.list()).map(toUser),
+    queryFn: async () => (await apiGetAll("/administration/AllUsers")).map(toUser),
   });
 
   const roomsList = rooms.data;
@@ -96,7 +123,7 @@ export function useData() {
 
   const invoices = invoicesQ.data;
   const payments = useMemo(
-    () => (invoices ?? []).flatMap((i) => i.paiements.map((p) => ({ ...p, factureId: i.id }))),
+    () => (invoices ?? []).flatMap((i) => (i.paiements ?? []).map((p) => ({ ...p, factureId: i.id }))),
     [invoices],
   );
 
@@ -108,7 +135,20 @@ export function useData() {
     invoices: invoices ?? [],
     payments,
     users: usersQ.data ?? [],
-    isLoading: rooms.isLoading || services.isLoading || auberge.isLoading,
+    isLoading:
+      rooms.isLoading ||
+      services.isLoading ||
+      auberge.isLoading ||
+      (Boolean(role) && (reservationsQ.isLoading || invoicesQ.isLoading)) ||
+      (role === "ADMIN" && usersQ.isLoading),
+    error:
+      rooms.error ||
+      services.error ||
+      auberge.error ||
+      reservationsQ.error ||
+      invoicesQ.error ||
+      usersQ.error ||
+      null,
   };
 }
 
@@ -131,23 +171,44 @@ export function useActions() {
     createService: useMutation({ mutationFn: (body) => ServicesAPI.create(body), onSuccess: refresh("services") }),
     updateService: useMutation({ mutationFn: ({ id, body }) => ServicesAPI.update(id, body), onSuccess: refresh("services") }),
     deleteService: useMutation({ mutationFn: (id) => ServicesAPI.remove(id), onSuccess: refresh("services") }),
+    createReceptionniste: useMutation({
+      mutationFn: (body) => UsersAPI.createReceptionniste(body),
+      onSuccess: refresh("users"),
+    }),
+    removeReceptionniste: useMutation({
+      mutationFn: (body) => UsersAPI.removeReceptionniste(body),
+      onSuccess: refresh("users"),
+    }),
 
     // réservations
     createReservation: useMutation({
       mutationFn: ({ chambreId, body }) => ReservationsAPI.create(chambreId, body),
       onSuccess: refresh("reservations", "invoices", "rooms"),
     }),
+    addReservationService: useMutation({
+      mutationFn: ({ id, body }) => ReservationsAPI.addService(id, body),
+      onSuccess: refresh("reservations", "invoices", "reservation-detail"),
+    }),
     cancelReservation: useMutation({
       mutationFn: (id) => ReservationsAPI.cancel(id),
-      onSuccess: refresh("reservations", "invoices", "rooms"),
+      onSuccess: refresh("reservations", "invoices", "rooms", "reservation-detail"),
     }),
-    checkIn: useMutation({ mutationFn: (id) => ReservationsAPI.checkIn(id), onSuccess: refresh("reservations", "rooms") }),
-    checkOut: useMutation({ mutationFn: (id) => ReservationsAPI.checkOut(id), onSuccess: refresh("reservations", "rooms", "invoices") }),
+    checkIn: useMutation({
+      mutationFn: (id) => ReservationsAPI.checkIn(id),
+      onSuccess: refresh("reservations", "rooms", "reservation-detail"),
+    }),
+    checkOut: useMutation({
+      mutationFn: (id) => ReservationsAPI.checkOut(id),
+      onSuccess: refresh("reservations", "rooms", "invoices", "reservation-detail"),
+    }),
 
     // paiement espèces
     payInvoice: useMutation({
       mutationFn: ({ id, body }) => InvoicesAPI.pay(id, body),
       onSuccess: refresh("invoices", "reservations"),
+    }),
+    resendPaymentConfirmation: useMutation({
+      mutationFn: (id) => InvoicesAPI.resendConfirmation(id),
     }),
 
     // admin

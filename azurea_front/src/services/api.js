@@ -94,12 +94,34 @@ export const api = {
   del: (p, body, o) => apiFetch(p, { ...o, method: "DELETE", body }),
 };
 
+export async function apiGetAll(path, key) {
+  const records = [];
+  let page = 1;
+  while (true) {
+    const separator = path.includes("?") ? "&" : "?";
+    const response = await api.get(`${path}${separator}page=${page}`);
+    const payload = key ? response?.[key] : response;
+    if (Array.isArray(payload)) {
+      records.push(...payload);
+      break;
+    }
+    if (!Array.isArray(payload?.data)) {
+      throw new Error(`Réponse API invalide pour ${path}.`);
+    }
+    records.push(...payload.data);
+    const lastPage = Number(payload.last_page ?? page);
+    if (!Number.isFinite(lastPage) || page >= lastPage) break;
+    page += 1;
+  }
+  return records;
+}
+
 const qs = (params = {}) => {
   const s = new URLSearchParams(params).toString();
   return s ? `?${s}` : "";
 };
 
-// ───────── Auth (inchangé) ─────────
+// ───────── Auth ─────────
 export const AuthAPI = {
   login: (email, password) => api.post("/auth/login", { email, password }),
   register: (payload) => api.post("/auth/register", payload),
@@ -109,7 +131,7 @@ export const AuthAPI = {
   logout: () => api.post("/auth/logout", {}),
 };
 
-// ───────── Profil (tous les utilisateurs connectés) ─────────
+// ───────── Profil ─────────
 export const ProfileAPI = {
   update: (body) => api.put("/me/update", body),
   changePassword: (body) => api.patch("/me/changepassword", body),

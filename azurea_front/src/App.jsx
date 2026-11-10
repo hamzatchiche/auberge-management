@@ -52,10 +52,23 @@ import { useRegister } from "./hooks/useRegister";
 import { useLogin } from "./hooks/useLogin";
 import { useforgot } from "./hooks/useForgot";
 import { useReset } from "./hooks/useReset";
-import { saveAuth, clearAuth, getStoredUser, getStoredToken } from "./services/auth";
-import { useData, useActions, useAvailableRoomIds } from "./hooks/queries";
-import { nights, reservationTotal, invoiceTotal, balance, invoiceStatus } from "./lib/helpers";
-import { apiMessage, roomBody, serviceBody, reservationBody, aubergeBody } from "./lib/normalize";
+import {
+  saveAuth,
+  clearAuth,
+  getStoredUser,
+  getStoredToken,
+  isAuthenticated,
+} from "./services/auth";
+import { AuthAPI } from "./services/api";
+import {
+  useData,
+  useAuberge,
+  useActions,
+  useAvailableRoomIds,
+  useReservationDetail,
+} from "./hooks/Queries";
+import { nights, reservationTotal, invoiceTotal, balance, invoiceStatus } from "./lib/Helpers";
+import { apiMessage, roomBody, serviceBody, reservationBody, aubergeBody } from "./lib/Normalize";
 
 const money = (n) =>
   new Intl.NumberFormat("fr-MA", {
@@ -63,14 +76,33 @@ const money = (n) =>
     currency: "MAD",
     maximumFractionDigits: 0,
   }).format(Number(n) || 0);
-const date = (s) =>
-  s
-    ? new Intl.DateTimeFormat("fr-FR", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }).format(new Date(s + "T12:00:00"))
-    : "—";
+const date = (value) => {
+  if (!value) return "—";
+  const datePart =
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:$|T|\s)/.test(value)
+      ? value.slice(0, 10)
+      : null;
+  const parsed =
+    value instanceof Date
+      ? value
+      : datePart
+        ? new Date(`${datePart}T12:00:00`)
+        : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
+};
+const brandInitial = (name) => [...String(name || "A")][0].toUpperCase();
+const roomImage = (room) => {
+  const details = `${room.type || ""} ${room.numero || ""}`.toLowerCase();
+  if (/terrasse|terrace/.test(details)) return "/suite-terrasse.jpg";
+  if (/famil|family|triple/.test(details)) return "/suite-familiale.jpg";
+  if (/double|chambre/.test(details)) return "/chambre-double.jpg";
+  return "/dar-selene-hero.jpg";
+};
 const localToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -97,6 +129,7 @@ const statusNames = {
 const menus = {
   CLIENT: [
     ["Vue d’ensemble", "/client/dashboard", Home],
+    ["Réserver un séjour", "/chambres", BedDouble],
     ["Mes réservations", "/client/reservations", CalendarDays],
     ["Mes factures", "/client/factures", Receipt],
     ["Mon profil", "/client/profil", UserRound],
@@ -163,11 +196,23 @@ function ToastHost() {
   ) : null;
 }
 function PublicNav() {
+  const { auberge } = useData();
+  const [session, setSession] = useState(() =>
+    isAuthenticated() ? getStoredUser() : null,
+  );
+  useEffect(() => {
+    const updateSession = () =>
+      setSession(isAuthenticated() ? getStoredUser() : null);
+    window.addEventListener("auberge-auth", updateSession);
+    return () => window.removeEventListener("auberge-auth", updateSession);
+  }, []);
+  const sessionRole = String(session?.role || "").toUpperCase();
+  const accountPath = roleBase[sessionRole] || "/connexion";
   return (
     <header className="public-nav">
       <Link href="/" className="brand">
-        <span className="brand-mark">D</span>
-        <span>DAR SÉLÉNÉ</span>
+        <span className="brand-mark">{brandInitial(auberge.nom)}</span>
+        <span>{auberge.nom || "Azuveria Médina"}</span>
       </Link>
       <nav className="nav-links">
         <Link href="/">Accueil</Link>
@@ -177,12 +222,23 @@ function PublicNav() {
         <Link href="/contact">Contact</Link>
       </nav>
       <div className="nav-actions">
-        <Link className="btn small" href="/connexion">
-          Connexion
+        <Link
+          className="btn small"
+          href={
+            session
+              ? sessionRole === "CLIENT"
+                ? "/client/profil"
+                : accountPath
+              : "/connexion"
+          }
+        >
+          {session ? (sessionRole === "CLIENT" ? "Mon profil" : "Mon espace") : "Connexion"}
         </Link>
-        <Link className="btn primary small" href="/inscription">
-          Réserver
-        </Link>
+        {(!session || sessionRole === "CLIENT") && (
+          <Link className="btn primary small" href="/chambres">
+            Réserver un séjour
+          </Link>
+        )}
       </div>
     </header>
   );
@@ -191,13 +247,25 @@ function Shell({ role, children }) {
   const [path, setPath] = useLocation();
   const [open, setOpen] = useState(false);
   const session = getStoredUser();
+  const { auberge } = useData();
+  const logout = async () => {
+    try {
+      await AuthAPI.logout();
+    } catch (error) {
+      toast(apiMessage(error));
+    } finally {
+      clearAuth();
+      queryClient.clear();
+      setPath("/connexion");
+    }
+  };
   return (
     <div className="dashboard-layout">
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <div className="side-brand">
           <Link className="brand" href={roleBase[role]}>
-            <span className="brand-mark">D</span>
-            <span>DAR SÉLÉNÉ</span>
+            <span className="brand-mark">{brandInitial(auberge.nom)}</span>
+            <span>{auberge.nom || "Azuveria Médina"}</span>
           </Link>
           <div
             style={{ fontSize: 11, color: "#bfc8d4", margin: "10px 0 0 49px" }}
@@ -226,11 +294,7 @@ function Shell({ role, children }) {
           <button
             className="side-link"
             style={{ width: "100%", border: 0, background: "none" }}
-            onClick={() => {
-              clearAuth();
-              queryClient.clear();
-              setPath("/connexion");
-            }}
+            onClick={logout}
           >
             <LogOut size={17} />
             Déconnexion
@@ -243,7 +307,7 @@ function Shell({ role, children }) {
             <Menu size={17} />
           </Button>
           <div className="breadcrumb">
-            Auberge Dar Séléné <ChevronRight size={13} /> {roleNames[role]}
+            Auberge {auberge.nom || "Azuveria Médina"} <ChevronRight size={13} /> {roleNames[role]}
           </div>
           <div className="topbar-right">
             <span className="user-label">
@@ -350,16 +414,14 @@ function HomePage() {
       <PublicNav />
       <section className="hero">
         <div className="hero-content">
-          <div className="eyebrow">Marrakech · Médina</div>
+          <div className="eyebrow">{data.auberge.ville || "Maison d’hôtes"}</div>
           <h1>
             Une maison,
             <br />
             mille attentions.
           </h1>
           <p>
-            Au détour d’une ruelle de la médina, Dar Séléné vous accueille comme
-            chez vous — avec la douceur d’une maison et le soin d’une belle
-            adresse.
+            Au cœur {data.auberge.ville ? `d’${data.auberge.ville}` : "de la ville"}, {data.auberge.nom || "la maison"} vous accueille dans une atmosphère paisible, où l’hospitalité marocaine et le confort se rencontrent.
           </p>
           <Link className="btn gold" href="/chambres">
             Découvrir la maison <ArrowRight size={16} />
@@ -371,7 +433,12 @@ function HomePage() {
           className="search-box"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!dates.from || !dates.to || dates.to <= dates.from) {
+            if (
+              !dates.from ||
+              !dates.to ||
+              dates.from < localToday() ||
+              dates.to <= dates.from
+            ) {
               toast("La date de départ doit être après la date d’arrivée.");
               return;
             }
@@ -385,6 +452,7 @@ function HomePage() {
               required
               className="input"
               type="date"
+              min={localToday()}
               value={dates.from}
               onChange={(e) => setDates({ ...dates, from: e.target.value })}
             />
@@ -395,6 +463,7 @@ function HomePage() {
               required
               className="input"
               type="date"
+              min={dates.from || localToday()}
               value={dates.to}
               onChange={(e) => setDates({ ...dates, to: e.target.value })}
             />
@@ -437,7 +506,9 @@ function HomePage() {
         <div className="section-head">
           <div>
             <div className="eyebrow">Nos chambres</div>
-            <h2>Votre refuge en médina</h2>
+            <h2>
+              Votre refuge{data.auberge.ville ? ` à ${data.auberge.ville}` : ""}
+            </h2>
           </div>
           <Link className="btn" href="/chambres">
             Toutes les chambres <ArrowRight size={15} />
@@ -475,9 +546,12 @@ function HomePage() {
       </section>
       <section className="section">
         <div className="room-detail">
-          <img src="/dar-selene-hero.jpg" alt="Patio de Dar Séléné" />
+          <img
+            src="/dar-selene-hero.jpg"
+            alt={`Maison d’hôtes ${data.auberge.nom || "à Agadir"}`}
+          />
           <div style={{ alignSelf: "center" }}>
-            <div className="eyebrow">L’esprit Dar Séléné</div>
+            <div className="eyebrow">L’esprit {data.auberge.nom || "de la maison"}</div>
             <h2>
               Le charme discret
               <br />
@@ -499,10 +573,20 @@ function HomePage() {
             <h2>La maison en lumière</h2>
           </div>
         </div>
-        <div
-          className="grid"
-          style={{ gridTemplateColumns: "2fr 1fr 1fr", height: 230 }}
-        ></div>
+        <div className="grid property-gallery">
+          {[
+            ["/chambre-double.jpg", "Chambre double"],
+            ["/suite-familiale.jpg", "Suite familiale"],
+            ["/suite-terrasse.jpg", "Suite avec terrasse"],
+          ].map(([src, alt]) => (
+            <img
+              key={src}
+              src={src}
+              alt={alt}
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+            />
+          ))}
+        </div>
       </section>
       <Footer />
     </>
@@ -520,7 +604,12 @@ function RoomCard({ room, availability }) {
   return (
     <article className="room-card">
       <Link href={`/chambres/${room.id}`}>
-        <div className="room-img" aria-hidden="true" />
+        <img
+          className="room-img"
+          src={roomImage(room)}
+          alt={`${room.type || "Chambre"} ${room.numero}`}
+          loading="lazy"
+        />
       </Link>
       <div className="room-body">
         <div className="eyebrow">{room.type}</div>
@@ -557,10 +646,11 @@ function Footer() {
     <footer className="public-footer">
       <div>
         <div className="brand" style={{ color: "white" }}>
-          <span className="brand-mark">D</span>DAR SÉLÉNÉ
+          <span className="brand-mark">{brandInitial(a.nom)}</span>
+          {a.nom || "Azuveria Médina"}
         </div>
         <p style={{ maxWidth: 320, color: "#cbd2de", lineHeight: 1.7 }}>
-          Une maison d’hôtes au cœur de la médina de Marrakech.
+          Une maison d’hôtes{a.ville ? ` à ${a.ville}` : ""}.
         </p>
       </div>
       <div>
@@ -584,7 +674,7 @@ function Footer() {
         </p>
       </div>
       <small style={{ alignSelf: "end", color: "#aeb9ca" }}>
-        © 2026 Dar Séléné · Marrakech
+        © {new Date().getFullYear()} {a.nom || "Azuveria Médina"}{a.ville ? ` · ${a.ville}` : ""}
       </small>
     </footer>
   );
@@ -603,12 +693,15 @@ function RoomsPage() {
   const [from, setFrom] = useState(search.from || "");
   const [to, setTo] = useState(search.to || "");
   const validDates = (!from && !to) || Boolean(from && to && to > from);
-  const { data: freeIds } = useAvailableRoomIds(
+  const availability = useAvailableRoomIds(
     from,
     to,
+    Number(search.adults || 1),
+    Number(search.children || 0),
     Boolean(from && to && validDates),
   );
-  const isFree = (id) => (freeIds ? freeIds.includes(id) : undefined);
+  const freeIds = availability.data;
+  const isFree = (id) => (freeIds ? freeIds.includes(String(id)) : undefined);
   const eligible = data.rooms.filter(
     (r) =>
       !["EN_NETTOYAGE", "EN_MAINTENANCE"].includes(r.statut) &&
@@ -618,13 +711,13 @@ function RoomsPage() {
       (!type || r.type === type) &&
       (!capacity || r.capacite >= Number(capacity)) &&
       (!maxPrice || r.prixNuit <= Number(maxPrice)) &&
-      ((!from && !to) || (validDates && isFree(r.id) !== false)),
+      ((!from && !to) || (validDates && isFree(r.id) === true)),
   );
   return (
     <>
       <PublicNav />
       <section className="section">
-        <div className="eyebrow">Séjourner à Dar Séléné</div>
+        <div className="eyebrow">Séjourner à {data.auberge.nom || "l’auberge"}</div>
         <h1 className="page-title">Nos chambres</h1>
         <p className="muted">
           Des espaces singuliers, pensés pour le repos et les retrouvailles.
@@ -671,6 +764,7 @@ function RoomsPage() {
               aria-label="Date d’arrivée"
               type="date"
               className="input"
+              min={localToday()}
               value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
@@ -678,6 +772,7 @@ function RoomsPage() {
               aria-label="Date de départ"
               type="date"
               className="input"
+              min={from || localToday()}
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
@@ -687,6 +782,12 @@ function RoomsPage() {
               Sélectionnez les deux dates et choisissez un départ après
               l’arrivée.
             </div>
+          )}
+          {validDates && from && to && availability.isLoading && (
+            <div className="notice" role="status">Vérification des disponibilités…</div>
+          )}
+          {availability.error && (
+            <div className="warning" role="alert">{apiMessage(availability.error)}</div>
           )}
         </div>
         <div className="grid rooms-grid">
@@ -714,18 +815,27 @@ function RoomDetail({ id }) {
     [, setPath] = useLocation();
   const actions = useActions();
   const r = data.rooms.find((x) => String(x.id) === String(id)),
-    search = JSON.parse(sessionStorage.getItem("auberge-search") || "{}");
+    search = JSON.parse(sessionStorage.getItem("auberge-search") || "{}"),
+    pending = JSON.parse(sessionStorage.getItem("pending-booking") || "null"),
+    initial = pending && String(pending.chambreId) === String(r?.id) ? pending : search;
   const [dates, setDates] = useState({
-    from: search.from || "",
-    to: search.to || "",
-    adults: search.adults || "2",
-    children: search.children || "0",
+    from: initial.from || "",
+    to: initial.to || "",
+    adults: initial.adults || "2",
+    children: initial.children || "0",
   });
   const validRange = Boolean(dates.from && dates.to && dates.to > dates.from);
-  const { data: freeIds } = useAvailableRoomIds(dates.from, dates.to, validRange);
+  const availability = useAvailableRoomIds(
+    dates.from,
+    dates.to,
+    Number(dates.adults),
+    Number(dates.children),
+    validRange,
+  );
+  const freeIds = availability.data;
   if (!r) return <PublicNav />;
   const guestCount = Number(dates.adults) + Number(dates.children),
-    dateAvailable = validRange && freeIds ? freeIds.includes(r.id) : null;
+    dateAvailable = validRange && freeIds ? freeIds.includes(String(r.id)) : null;
   return (
     <>
       <PublicNav />
@@ -734,6 +844,10 @@ function RoomDetail({ id }) {
           <Link href="/chambres">Chambres</Link> / Chambre {r.numero}
         </div>
         <div className="room-detail">
+          <img
+            src={roomImage(r)}
+            alt={`${r.type || "Chambre"} ${r.numero}`}
+          />
           <div>
             <div className="eyebrow">{r.type}</div>
             <h1 className="page-title">Chambre {r.numero}</h1>
@@ -750,6 +864,12 @@ function RoomDetail({ id }) {
                   : "Indisponible aux dates choisies ou chambre en préparation."}
               </div>
             )}
+            {validRange && availability.isLoading && (
+              <div className="notice" role="status">Vérification des disponibilités…</div>
+            )}
+            {availability.error && (
+              <div className="warning" role="alert">{apiMessage(availability.error)}</div>
+            )}
             <form
               className="panel"
               style={{ marginTop: 22 }}
@@ -757,6 +877,10 @@ function RoomDetail({ id }) {
                 e.preventDefault();
                 if (!(dates.to > dates.from)) {
                   toast("La date de départ doit suivre la date d’arrivée.");
+                  return;
+                }
+                if (dates.from < localToday()) {
+                  toast("La date d’arrivée ne peut pas être dans le passé.");
                   return;
                 }
                 if (guestCount > r.capacite) {
@@ -769,9 +893,7 @@ function RoomDetail({ id }) {
                   toast("Chambre indisponible aux dates choisies.");
                   return;
                 }
-                const session = JSON.parse(
-                  localStorage.getItem("auberge-session") || "null",
-                );
+                const session = isAuthenticated() ? getStoredUser() : null;
                 if (!session) {
                   sessionStorage.setItem(
                     "pending-booking",
@@ -780,7 +902,7 @@ function RoomDetail({ id }) {
                   setPath("/connexion");
                   return;
                 }
-                if (session.role !== "CLIENT") {
+                if (String(session.role).toUpperCase() !== "CLIENT") {
                   toast("Seuls les clients peuvent réserver.");
                   return;
                 }
@@ -788,6 +910,9 @@ function RoomDetail({ id }) {
                   { chambreId: r.id, body: reservationBody(dates) },
                   {
                     onSuccess: () => {
+                      if (String(pending?.chambreId) === String(r.id)) {
+                        sessionStorage.removeItem("pending-booking");
+                      }
                       toast("Votre demande de réservation est envoyée.");
                       setPath("/client/reservations");
                     },
@@ -801,6 +926,7 @@ function RoomDetail({ id }) {
                 <Input
                   label="Arrivée"
                   type="date"
+                  min={localToday()}
                   required
                   value={dates.from}
                   onChange={(e) => setDates({ ...dates, from: e.target.value })}
@@ -808,6 +934,7 @@ function RoomDetail({ id }) {
                 <Input
                   label="Départ"
                   type="date"
+                  min={dates.from || localToday()}
                   required
                   value={dates.to}
                   onChange={(e) => setDates({ ...dates, to: e.target.value })}
@@ -881,12 +1008,12 @@ function PublicSimple({ type }) {
         <section className="section">
           <div className="room-detail">
             <img
-              src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1100&q=85"
-              alt="Patio"
+              src="/dar-selene-hero.jpg"
+              alt={`Maison d’hôtes ${d.auberge.nom || "à Agadir"}`}
             />
             <div>
               <div className="eyebrow">Notre maison</div>
-              <h1 className="page-title">Une adresse au coeur de Marrakech.</h1>
+              <h1 className="page-title">Une adresse à {d.auberge.ville || "découvrir"}.</h1>
               <p className="muted" style={{ lineHeight: 1.9 }}>
                 {d.auberge.description || ""}
               </p>
@@ -928,6 +1055,8 @@ function PublicSimple({ type }) {
 }
 
 function AuthPage({ mode }) {
+  const { auberge } = useData();
+  const actions = useActions();
   const [feedback, setFeedback] = useState("");
   const [, setpath] = useLocation();
   const registerMutation = useRegister();
@@ -986,7 +1115,46 @@ function AuthPage({ mode }) {
             token: response.token,
             user: { ...response.user, role },
           });
-          setpath(roleBase[role] || "/");
+          AuthAPI.me().then((profile) => {
+            saveAuth({
+              token: getStoredToken(),
+              user: { ...response.user, ...profile?.user, role },
+            });
+            const pending = JSON.parse(
+              sessionStorage.getItem("pending-booking") || "null",
+            );
+            if (role === "CLIENT" && pending?.chambreId) {
+              actions.createReservation.mutate(
+                {
+                  chambreId: pending.chambreId,
+                  body: reservationBody(pending),
+                },
+                {
+                  onSuccess: () => {
+                    sessionStorage.removeItem("pending-booking");
+                    toast("Votre demande de réservation est envoyée.");
+                    setpath("/client/reservations");
+                  },
+                  onError: (error) => {
+                    fail(error);
+                    setpath(`/chambres/${pending.chambreId}`);
+                  },
+                },
+              );
+              return;
+            }
+            setpath(roleBase[role] || "/");
+          }).catch((error) => {
+            fail(error);
+            const pending = JSON.parse(
+              sessionStorage.getItem("pending-booking") || "null",
+            );
+            setpath(
+              role === "CLIENT" && pending?.chambreId
+                ? `/chambres/${pending.chambreId}`
+                : roleBase[role] || "/",
+            );
+          });
         },
         onError: fail,
       });
@@ -1035,7 +1203,10 @@ function AuthPage({ mode }) {
       <div className="auth-wrap">
         <div className="auth-photo">
           <div>
-            <div className="eyebrow">Dar Selene - Marrakech</div>
+            <div className="eyebrow">
+              {auberge.nom || "Azuveria Médina"}
+              {auberge.ville ? ` · ${auberge.ville}` : ""}
+            </div>
 
             <h2 className="serif" style={{ fontSize: 38 }}>
               L hospitalite
@@ -1065,8 +1236,8 @@ function AuthPage({ mode }) {
           <form onSubmit={submit}>
             {mode === "register" && (
               <div className="form-grid">
-                <Input label="Prenom" name="prenom" required />
-                <Input label="Nom" name="nom" required />
+                <Input label="Prenom" name="prenom" maxLength="20" required />
+                <Input label="Nom" name="nom" maxLength="20" required />
               </div>
             )}
 
@@ -1176,6 +1347,12 @@ function DashboardPage({ role }) {
         <PageHead
           title={me.prenom ? `Bonjour ${me.prenom},` : "Bonjour,"}
           subtitle="Votre prochaine escapade se prépare ici."
+          action={
+            <Link className="btn primary" href="/chambres">
+              <BedDouble size={15} />
+              Réserver un séjour
+            </Link>
+          }
         />
         <div className="cards">
           <Metric
@@ -1346,7 +1523,7 @@ function DashboardPage({ role }) {
     <>
       <PageHead
         title="Tableau de bord"
-        subtitle="Vue d’ensemble de Dar Séléné."
+        subtitle={`Vue d’ensemble de ${d.auberge.nom || "l’auberge"}.`}
       />
       <div className="cards">
         <Metric
@@ -1595,7 +1772,8 @@ function ReservationsTable({ rows, client = false }) {
     </div>
   );
 }
-function InvoiceView({ invoice, client = false }) {
+function InvoiceView({ invoice, client = false, receptionist = false }) {
+  const actions = useActions();
   const { auberge, reservations } = useData();
   const b =
     invoice.reservation ??
@@ -1603,11 +1781,7 @@ function InvoiceView({ invoice, client = false }) {
   if (!b) return <div className="empty">Réservation associée introuvable.</div>;
   const room = b.chambre,
     rate = b.prixNuitApplique ?? room?.prixNuit ?? 0;
-  const serviceLines = (b.services || []).map((sv) => ({
-    nom: sv.nom || "Service",
-    quantite: sv.quantite,
-    prix: sv.prixUnitaireApplique,
-  }));
+  const invoiceLines = invoice.lignesFacture || [];
   return (
     <>
       <div className="panel" id="invoice-print">
@@ -1616,7 +1790,8 @@ function InvoiceView({ invoice, client = false }) {
         >
           <div>
             <div className="brand">
-              <span className="brand-mark">D</span>DAR SÉLÉNÉ
+              <span className="brand-mark">{brandInitial(auberge.nom)}</span>
+              {auberge.nom || "Azuveria Médina"}
             </div>
             <p className="muted">
               {auberge.adresse} · {auberge.ville}
@@ -1666,22 +1841,21 @@ function InvoiceView({ invoice, client = false }) {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>
-                  Chambre {room?.numero} — {nights(b)} nuit(s)
-                </td>
-                <td>{nights(b)}</td>
-                <td>{money(rate)}</td>
-                <td>{money(nights(b) * rate)}</td>
-              </tr>
-              {serviceLines.map((s, i) => (
-                <tr key={i}>
-                  <td>{s.nom}</td>
-                  <td>{s.quantite}</td>
-                  <td>{money(s.prix)}</td>
-                  <td>{money(s.quantite * s.prix)}</td>
+              {invoiceLines.length ? invoiceLines.map((line, index) => (
+                <tr key={line.id ?? index}>
+                  <td>{line.description}</td>
+                  <td>{line.quantite}</td>
+                  <td>{money(line.prixUnitaire)}</td>
+                  <td>{money(line.sousTotal)}</td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td>Chambre {room?.numero} — {nights(b)} nuit(s)</td>
+                  <td>{nights(b)}</td>
+                  <td>{money(rate)}</td>
+                  <td>{money(nights(b) * rate)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -1717,19 +1891,37 @@ function InvoiceView({ invoice, client = false }) {
             Pour régler, adressez-vous à la réception.
           </span>
         )}
+        {receptionist && invoice.statut === "PAYEE" && (
+          <Button
+            onClick={() =>
+              actions.resendPaymentConfirmation.mutate(invoice.id, {
+                onSuccess: () => toast("Confirmation de paiement renvoyée."),
+                onError: (error) => toast(apiMessage(error)),
+              })
+            }
+          >
+            Renvoyer la confirmation
+          </Button>
+        )}
       </div>
     </>
   );
 }
 function DataPage({ role, path, id }) {
+  const [, setPath] = useLocation();
   const data = useData();
   const actions = useActions();
+  const isReservationDetail =
+    path.startsWith("/client/reservations/") ||
+    path.startsWith("/reception/reservations/");
+  const reservationDetail = useReservationDetail(id, role, isReservationDetail);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [modal, setModal] = useState("");
   const [edit, setEdit] = useState(null);
   const [selection, setSelection] = useState("");
-  const [amount, setAmount] = useState("");
+  const [serviceSelection, setServiceSelection] = useState("");
+  const [serviceQuantity, setServiceQuantity] = useState("1");
   const [filterRole, setFilterRole] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -1740,10 +1932,28 @@ function DataPage({ role, path, id }) {
     setModal(type);
   };
   const fail = (e) => toast(apiMessage(e));
+  if (data.error) {
+    return <div className="warning" role="alert">{apiMessage(data.error)}</div>;
+  }
+  if (data.isLoading) {
+    return <div className="panel" role="status">Chargement des données…</div>;
+  }
+  if (isReservationDetail && reservationDetail.isLoading) {
+    return <div className="panel" role="status">Chargement de la réservation…</div>;
+  }
+  if (isReservationDetail && reservationDetail.error) {
+    return <div className="warning" role="alert">{apiMessage(reservationDetail.error)}</div>;
+  }
   const saveModal = (values) => {
     const done = {
       onSuccess: () => {
-        toast(edit ? "Enregistré." : "Ajouté.");
+        toast(
+          modal === "receptionniste"
+            ? "Compte créé. Un lien d’activation a été envoyé par e-mail."
+            : edit
+              ? "Enregistré."
+              : "Ajouté.",
+        );
         setModal("");
       },
       onError: fail,
@@ -1760,9 +1970,13 @@ function DataPage({ role, path, id }) {
     m.mutate(edit ? { id: edit.id, body } : body, done);
   };
   if (path.endsWith("/dashboard")) return <DashboardPage role={role} />;
-  const canCancel = (b) =>
-    ["EN_ATTENTE", "CONFIRMEE"].includes(b.statut) &&
-    b.dateDebut > new Date().toISOString().slice(0, 10);
+  const canCancel = (b) => {
+    const createdAt = b.createdAt ? new Date(b.createdAt).getTime() : NaN;
+    return b.statut === "CONFIRMEE" &&
+      b.dateDebut > new Date().toISOString().slice(0, 10) &&
+      Number.isFinite(createdAt) &&
+      Date.now() <= createdAt + 24 * 60 * 60 * 1000;
+  };
   if (path === "/client/reservations" || path === "/reception/reservations") {
     let rows = data.reservations.filter(
       (b) =>
@@ -1837,7 +2051,8 @@ function DataPage({ role, path, id }) {
     path.startsWith("/client/reservations/") ||
     path.startsWith("/reception/reservations/")
   ) {
-    const b = data.reservations.find((x) => String(x.id) === String(id));
+    const b = reservationDetail.data ??
+      data.reservations.find((x) => String(x.id) === String(id));
     if (!b) return <EmptyPage text="Cette réservation est introuvable." />;
     const inv = data.invoices.find((i) => i.reservationId === b.id);
     return (
@@ -1874,6 +2089,17 @@ function DataPage({ role, path, id }) {
               <b>Montant estimé :</b> {money(reservationTotal(b))}
             </p>
             <Status value={b.statut} />
+            {b.services.length > 0 && (
+              <div>
+                <h4>Services associés</h4>
+                {b.services.map((service, index) => (
+                  <p key={service.id ?? `${service.serviceId}-${index}`}>
+                    {service.nom} × {service.quantite} —{" "}
+                    {money(service.quantite * service.prixUnitaireApplique)}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
           <div className="panel">
             <h3>Actions</h3>
@@ -1896,6 +2122,62 @@ function DataPage({ role, path, id }) {
                   Consulter la facture {inv.numero}
                 </Link>
               </p>
+            )}
+            {client && inv && balance(inv) > 0 && b.statut !== "ANNULEE" && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!serviceSelection) {
+                    toast("Choisissez un service.");
+                    return;
+                  }
+                  actions.addReservationService.mutate(
+                    {
+                      id: b.id,
+                      body: {
+                        services: [{
+                          service_id: Number(serviceSelection),
+                          quantite: Number(serviceQuantity),
+                        }],
+                      },
+                    },
+                    {
+                      onSuccess: () => {
+                        toast("Service ajouté à la réservation.");
+                        setServiceSelection("");
+                        setServiceQuantity("1");
+                      },
+                      onError: fail,
+                    },
+                  );
+                }}
+              >
+                <h4>Ajouter un service</h4>
+                <Select
+                  label="Service"
+                  value={serviceSelection}
+                  onChange={(event) => setServiceSelection(event.target.value)}
+                  options={[
+                    ["", "Choisir un service"],
+                    ...data.services
+                      .filter((service) => service.actif)
+                      .map((service) => [
+                        service.id,
+                        `${service.nom} — ${money(service.prixUnitaire)}`,
+                      ]),
+                  ]}
+                />
+                <Input
+                  label="Quantité"
+                  type="number"
+                  min="1"
+                  step="1"
+                  required
+                  value={serviceQuantity}
+                  onChange={(event) => setServiceQuantity(event.target.value)}
+                />
+                <FormButton>Ajouter à la facture</FormButton>
+              </form>
             )}
             {canCancel(b) && (
               <Button
@@ -2005,7 +2287,11 @@ function DataPage({ role, path, id }) {
     return inv ? (
       <>
         <PageHead title={`Facture ${inv.numero}`} />
-        <InvoiceView invoice={inv} client={client} />
+        <InvoiceView
+          invoice={inv}
+          client={client}
+          receptionist={receptionist}
+        />
       </>
     ) : (
       <EmptyPage text="Facture introuvable." />
@@ -2047,11 +2333,19 @@ function DataPage({ role, path, id }) {
                 required
               />
               <Input
-                name="email"
                 label="Adresse e-mail"
                 type="email"
-                defaultValue={me.email || ""}
-                required
+                value={me.email || ""}
+                readOnly
+              />
+              <Select
+                name="genre"
+                label="Genre"
+                defaultValue={me.genre || "femme"}
+                options={[
+                  ["femme", "Femme"],
+                  ["homme", "Homme"],
+                ]}
               />
             </div>
             <FormButton>Enregistrer mon profil</FormButton>
@@ -2075,8 +2369,11 @@ function DataPage({ role, path, id }) {
               }
               actions.changePassword.mutate(f, {
                 onSuccess: () => {
-                  toast("Mot de passe modifié.");
+                  toast("Mot de passe modifié. Reconnectez-vous.");
                   form.reset();
+                  clearAuth();
+                  queryClient.clear();
+                  setPath("/connexion");
                 },
                 onError: fail,
               });
@@ -2113,7 +2410,7 @@ function DataPage({ role, path, id }) {
       <>
         <PageHead
           title="Chambres"
-          subtitle="État opérationnel des chambres de Dar Séléné."
+          subtitle={`État opérationnel des chambres de ${data.auberge.nom || "l’auberge"}.`}
           action={
             <Button kind="primary" onClick={() => editItem("room")}>
               <Plus size={15} />
@@ -2191,9 +2488,12 @@ function DataPage({ role, path, id }) {
                             actions.setRoomStatus.mutate(
                               {
                                 id: r.id,
-                                body: { statut: e.target.value.toLowerCase() },
+                                body: { status: e.target.value.toLowerCase() },
                               },
-                              { onError: fail },
+                              {
+                                onSuccess: () => toast("Statut de la chambre mis à jour."),
+                                onError: fail,
+                              },
                             )
                           }
                         >
@@ -2328,15 +2628,23 @@ function DataPage({ role, path, id }) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!selection) {
+                toast("Choisissez une facture à régler.");
+                return;
+              }
               actions.payInvoice.mutate(
-                { id: selection, body: { montant: Number(amount) } },
+                { id: selection, body: {} },
                 {
                   onSuccess: () => {
-                    toast("Paiement enregistré.");
-                    setAmount("");
+                    toast("Paiement intégral enregistré.");
                     setSelection("");
                   },
-                  onError: fail,
+                  onError: (error) => {
+                    fail(error);
+                    if (error.status === 503 && error.data?.facture) {
+                      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                    }
+                  },
                 },
               );
             }}
@@ -2354,18 +2662,13 @@ function DataPage({ role, path, id }) {
               ]}
             />
             <Input
-              label="Montant recu (MAD)"
-              type="number"
-              min="0.01"
-              step="0.01"
-              max={
+              label="Montant à régler (MAD)"
+              value={
                 selection
-                  ? balance(data.invoices.find((i) => String(i.id) === String(selection)))
-                  : undefined
+                  ? money(balance(data.invoices.find((i) => String(i.id) === String(selection)) || {}))
+                  : "Sélectionnez une facture"
               }
-              required
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              readOnly
             />
             <div className="notice-bar" style={{ marginBottom: 15 }}>
               Mode de paiement : especes uniquement.
@@ -2561,12 +2864,13 @@ function DataPage({ role, path, id }) {
               required
             />
             <div className="form-grid">
-              <Input label="Adresse" name="adresse" defaultValue={a.adresse} />
-              <Input label="Ville" name="ville" defaultValue={a.ville} />
+              <Input label="Adresse" name="adresse" defaultValue={a.adresse} required />
+              <Input label="Ville" name="ville" defaultValue={a.ville} required />
               <Input
                 label="Téléphone"
                 name="telephone"
                 defaultValue={a.telephone}
+                required
               />
             </div>
             <div className="form-field">
@@ -2575,6 +2879,7 @@ function DataPage({ role, path, id }) {
                 className="textarea"
                 name="description"
                 defaultValue={a.description}
+                required
               />
             </div>
             <FormButton>Enregistrer les informations</FormButton>
@@ -2894,17 +3199,6 @@ function EntityModal({ type, item, onClose, onSubmit }) {
                 required
               />
             </div>
-            <Select
-              label="Statut operationnel"
-              name="statut"
-              defaultValue={item?.statut || "DISPONIBLE"}
-              options={[
-                "DISPONIBLE",
-                "OCCUPEE",
-                "EN_NETTOYAGE",
-                "EN_MAINTENANCE",
-              ].map((x) => [x, statusNames[x]])}
-            />
           </>
         )}
         {type === "service" && (
@@ -2921,6 +3215,7 @@ function EntityModal({ type, item, onClose, onSubmit }) {
                 className="textarea"
                 name="description"
                 defaultValue={item?.description}
+                required
               />
             </div>
             <Input
@@ -2956,21 +3251,7 @@ function EntityModal({ type, item, onClose, onSubmit }) {
                 ["homme", "Homme"],
               ]}
             />
-            <Input label="Adresse e-mail" name="email" type="email" required />
-            <Input
-              label="Mot de passe"
-              name="password"
-              type="password"
-              minLength="8"
-              required
-            />
-            <Input
-              label="Confirmer le mot de passe"
-              name="password_confirmation"
-              type="password"
-              minLength="8"
-              required
-            />
+            <Input label="Adresse e-mail" name="email" type="email" maxLength="255" required />
           </>
         )}
         <div
@@ -3043,8 +3324,16 @@ function AccessDenied() {
   );
 }
 function RoutePage() {
-  const [path] = useLocation();
+  const [path, setPath] = useLocation();
   const params = useParams();
+  useEffect(() => {
+    if (path === "/connexion" || path === "/inscription") {
+      const role = isAuthenticated()
+        ? String(getStoredUser()?.role || "").toUpperCase()
+        : "";
+      if (roleBase[role]) setPath(roleBase[role]);
+    }
+  }, [path, setPath]);
   if (path === "/") return <HomePage />;
   if (path === "/chambres") return <RoomsPage />;
   if (path.startsWith("/chambres/"))
@@ -3091,10 +3380,10 @@ function RoutePage() {
         : group === "reception"
           ? "RECEPTIONNISTE"
           : "ADMIN";
-    const session = JSON.parse(
-      localStorage.getItem("auberge-session") || "null",
-    );
-    if (!session || session.role !== role) return <AccessDenied />;
+    const session = isAuthenticated() ? getStoredUser() : null;
+    if (!session || String(session.role).toUpperCase() !== role) {
+      return <AccessDenied />;
+    }
     const supported =
       role === "CLIENT"
         ? [
@@ -3148,9 +3437,19 @@ function NotFoundPage() {
     </>
   );
 }
+function PageTitle() {
+  const { data: auberge } = useAuberge();
+  useEffect(() => {
+    const name = auberge?.nom || "Azuveria Médina";
+    const city = auberge?.ville ? ` à ${auberge.ville}` : "";
+    document.title = `${name} — Maison d’hôtes${city}`;
+  }, [auberge?.nom, auberge?.ville]);
+  return null;
+}
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <PageTitle />
       <Switch>
         {routePaths.map((p) => (
           <Route key={p} path={p} component={RoutePage} />
