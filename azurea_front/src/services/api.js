@@ -168,6 +168,7 @@ export const ReservationsAPI = {
     api.post(`/chambres/${chambreId}/reservation`, body),
   cancel: (id) => api.patch(`/reservations/${id}/cancel`, {}),
   addService: (id, body) => api.patch(`/reservations/${id}/services`, body),
+ 
   // réception
   all: () => api.get("/reservations"),
   byId: (id) => api.get(`/reservation/${id}`),
@@ -192,4 +193,6 @@ export const UsersAPI = {
     api.post("/administration/createReceptionniste", body),
   removeReceptionniste: (body) =>
     api.del("/administration/receptionniste", body),
+  
+  byId: (id) => api.get(`/reservation/${id}`),
 };

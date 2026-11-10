@@ -1402,7 +1402,7 @@ function DashboardPage({ role }) {
           </div>
         )}
         <PageHead title="Derniers séjours" />
-        <ReservationsTable rows={mine.slice(0, 5)} client />
+        <ReservationsTable role={role} rows={mine.slice(0, 5)} client />
       </>
     );
   }
@@ -1500,7 +1500,7 @@ function DashboardPage({ role }) {
         </div>
         <div className="panel">
           <h3>Arrivées attendues</h3>
-          <ReservationsTable rows={arrivals} />
+          <ReservationsTable role={role} rows={arrivals} />
         </div>
       </>
     );
@@ -1584,7 +1584,7 @@ function DashboardPage({ role }) {
       </div>
       <div className="panel">
         <h3>Réservations récentes</h3>
-        <ReservationsTable rows={bookings.slice(0, 5)} />
+        <ReservationsTable role={role} rows={bookings.slice(0, 5)} />
       </div>
     </>
   );
@@ -1721,7 +1721,7 @@ function RoomPie({ rooms }) {
     </div>
   );
 }
-function ReservationsTable({ rows, client = false }) {
+function ReservationsTable({role, rows, client = false }) {
   return (
     <div className="table-wrap">
       <table>
@@ -1753,6 +1753,7 @@ function ReservationsTable({ rows, client = false }) {
               <td>
                 <Status value={b.statut} />
               </td>
+              {role==="RECEPTIONNISTE" &&(
               <td>
                 <Link
                   className="btn small"
@@ -1761,7 +1762,7 @@ function ReservationsTable({ rows, client = false }) {
                   <Eye size={14} />
                   Voir
                 </Link>
-              </td>
+              </td>)}
             </tr>
           ))}
         </tbody>
@@ -2039,7 +2040,7 @@ function DataPage({ role, path, id }) {
               onChange={(e) => setDateTo(e.target.value)}
             />
           </div>
-          <ReservationsTable rows={rows} client={client} />
+          <ReservationsTable role={role} rows={rows} client={client} />
         </div>
         {modal && (
           <EntityModal type={modal} item={edit} onClose={() => setModal("")} onSubmit={saveModal} />
