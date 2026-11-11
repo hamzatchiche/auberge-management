@@ -1,50 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, Route, Switch, useLocation, useParams } from "wouter";
-import {
-  BedDouble,
-  CalendarDays,
-  Users,
-  Receipt,
-  CreditCard,
-  Settings,
-  ChartNoAxesCombined,
-  Home,
-  UserRound,
-  LogOut,
-  Menu,
-  X,
-  Plus,
-  Search,
-  ArrowRight,
-  ChevronRight,
-  MapPin,
-  Phone,
-  Check,
-  CircleAlert,
-  DoorOpen,
-  Sparkles,
-  Download,
-  Printer,
-  Pencil,
-  Trash2,
-  Eye,
-  ShieldCheck,
+import {BedDouble,CalendarDays,Users,Receipt,CreditCard,Settings,ChartNoAxesCombined,Home,UserRound,LogOut,Menu,X,Plus,Search,ArrowRight,ChevronRight,MapPin,Phone,Check,CircleAlert,DoorOpen,Sparkles,Download,Printer,Pencil,Trash2,Eye,ShieldCheck,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
+import {ResponsiveContainer,AreaChart,Area,BarChart,Bar,LineChart,Line,XAxis,YAxis,Tooltip,CartesianGrid,PieChart,Pie,Cell,
 } from "recharts";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/QueryClient";
@@ -52,20 +10,10 @@ import { useRegister } from "./hooks/useRegister";
 import { useLogin } from "./hooks/useLogin";
 import { useforgot } from "./hooks/useForgot";
 import { useReset } from "./hooks/useReset";
-import {
-  saveAuth,
-  clearAuth,
-  getStoredUser,
-  getStoredToken,
-  isAuthenticated,
+import {saveAuth,clearAuth,getStoredUser,getStoredToken,isAuthenticated,
 } from "./services/auth";
 import { AuthAPI } from "./services/api";
-import {
-  useData,
-  useAuberge,
-  useActions,
-  useAvailableRoomIds,
-  useReservationDetail,
+import {useData,useAuberge,useActions,useAvailableRoomIds,useReservationDetail,
 } from "./hooks/Queries";
 import { nights, reservationTotal, invoiceTotal, balance, invoiceStatus } from "./lib/Helpers";
 import { apiMessage, roomBody, serviceBody, reservationBody, aubergeBody } from "./lib/Normalize";
@@ -79,13 +27,9 @@ const money = (n) =>
 const date = (value) => {
   if (!value) return "—";
   const datePart =
-    typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:$|T|\s)/.test(value)
-      ? value.slice(0, 10)
-      : null;
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:$|T|\s)/.test(value)? value.slice(0, 10): null;
   const parsed =
-    value instanceof Date
-      ? value
-      : datePart
+    value instanceof Date? value: datePart
         ? new Date(`${datePart}T12:00:00`)
         : new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
@@ -184,7 +128,7 @@ function ToastHost() {
   useEffect(() => {
     const f = (e) => {
       setMessage(e.detail);
-      setTimeout(() => setMessage(""), 3200);
+      setTimeout(() => setMessage(""), 3000);
     };
     window.addEventListener("auberge-toast", f);
     return () => window.removeEventListener("auberge-toast", f);
