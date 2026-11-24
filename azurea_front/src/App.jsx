@@ -1720,13 +1720,22 @@ function ReservationsTable({role, rows, client = false }) {
 function InvoiceView({ invoice, client = false, receptionist = false }) {
   const actions = useActions();
   const { auberge, reservations } = useData();
+
+
+  const reservationId = invoice.reservationId ?? invoice.reservation_id;
   const b =
     invoice.reservation ??
-    reservations.find((x) => x.id === invoice.reservationId);
-  if (!b) return <div className="empty">Réservation associée introuvable.</div>;
-  const room = b.chambre,
-    rate = b.prixNuitApplique ?? room?.prixNuit ?? 0;
-  const invoiceLines = invoice.lignesFacture || [];
+    reservations.find((item) => String(item.id) === String(reservationId));
+
+  const room = b?.chambre ?? invoice.chambre ?? null;
+  const invoiceClient = b?.client ?? invoice.client ?? null;
+  const rate = b?.prixNuitApplique ?? room?.prixNuit ?? 0;
+  const invoiceLines = Array.isArray(invoice.lignesFacture)
+    ? invoice.lignesFacture
+    : Array.isArray(invoice.lignes_facture)
+      ? invoice.lignes_facture
+      : [];
+  const nightsCount = b ? nights(b) : 0;
   return (
     <>
       <div className="panel" id="invoice-print">
@@ -1761,17 +1770,18 @@ function InvoiceView({ invoice, client = false, receptionist = false }) {
           <div>
             <b>Client</b>
             <p>
-              {b.client?.prenom} {b.client?.nom}
+              {invoiceClient?.prenom || invoiceClient?.first_name || "—"}{" "}
+              {invoiceClient?.nom || invoiceClient?.last_name || ""}
               <br />
-              {b.client?.email}
+              {invoiceClient?.email || "—"}
             </p>
           </div>
           <div>
             <b>Séjour</b>
             <p>
-              Réf. {b.reference} · Chambre {room?.numero}
+              Réf. {b?.reference || invoice.referenceReservation || "—"} · Chambre {room?.numero || "—"}
               <br />
-              {date(b.dateDebut)} – {date(b.dateFin)}
+              {b ? `${date(b.dateDebut)} – ${date(b.dateFin)}` : "Informations du séjour non retournées par l’API."}
             </p>
           </div>
         </div>
@@ -1793,12 +1803,18 @@ function InvoiceView({ invoice, client = false, receptionist = false }) {
                   <td>{money(line.prixUnitaire)}</td>
                   <td>{money(line.sousTotal)}</td>
                 </tr>
-              )) : (
+              )) : b ? (
                 <tr>
-                  <td>Chambre {room?.numero} — {nights(b)} nuit(s)</td>
-                  <td>{nights(b)}</td>
+                  <td>Chambre {room?.numero || "—"} — {nightsCount} nuit(s)</td>
+                  <td>{nightsCount}</td>
                   <td>{money(rate)}</td>
-                  <td>{money(nights(b) * rate)}</td>
+                  <td>{money(nightsCount * rate)}</td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={4} className="muted">
+                    Les lignes détaillées de cette facture ne sont pas disponibles.
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -1821,10 +1837,6 @@ function InvoiceView({ invoice, client = false, receptionist = false }) {
           </p>
           <Status value={invoiceStatus(invoice)} />
         </div>
-        <div className="notice-bar no-print" style={{ marginTop: 20 }}>
-          Règlement à la réception, en espèces uniquement. Aucun paiement en
-          ligne.
-        </div>
       </div>
       <div className="no-print" style={{ display: "flex", gap: 10 }}>
         <Button onClick={() => window.print()}>
@@ -1836,7 +1848,7 @@ function InvoiceView({ invoice, client = false, receptionist = false }) {
             Pour régler, adressez-vous à la réception.
           </span>
         )}
-        {receptionist && invoice.statut === "PAYEE" && (
+        {receptionist && invoiceStatus(invoice) === "PAYEE" && (
           <Button
             onClick={() =>
               actions.resendPaymentConfirmation.mutate(invoice.id, {
@@ -2183,8 +2195,8 @@ function DataPage({ role, path, id }) {
               <tbody>
                 {mine.map((i) => {
                   const b = data.reservations.find(
-                    (x) => x.id === i.reservationId,
-                  );
+                    (x) => String(x.id) === String(i.reservationId ?? i.reservation_id),
+                  ) ?? i.reservation;
                   return (
                     <tr key={i.id}>
                       <td>
@@ -3241,6 +3253,7 @@ const routePaths = [
   "/reception/reservations/:id",
   "/reception/services",
   "/reception/factures",
+  "/reception/factures/:id",
   "/reception/paiements",
   "/reception/check-in-out",
   "/admin/dashboard",
