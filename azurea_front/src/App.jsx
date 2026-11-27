@@ -510,7 +510,7 @@ function HomePage() {
           </div>
         </div>
       </section>
-      <section className="section" style={{ paddingTop: 0 }}>
+      <section className="section" style={{ paddingTop: 0 ,marginBottom:64}}>
         <div className="section-head">
           <div>
             <div className="eyebrow">Quelques images</div>
@@ -986,10 +986,7 @@ function PublicSimple({ type }) {
             <p>
               <Phone size={16} /> {d.auberge.telephone || "Non renseigne"}
             </p>
-            <div className="notice-bar">
-              Le formulaire de contact sera ajoute lorsque son endpoint sera
-              disponible.
-            </div>
+            
           </div>
         </div>
       </section>
@@ -1665,7 +1662,11 @@ function RoomPie({ rooms }) {
     </div>
   );
 }
-function ReservationsTable({role, rows, client = false }) {
+function ReservationsTable({ role, rows, client = false }) {
+  const normalizedRole = role?.toUpperCase();
+  const isClient = client || normalizedRole === "CLIENT";
+  const canView = normalizedRole === "RECEPTIONNISTE" || normalizedRole === "CLIENT";
+
   return (
     <div className="table-wrap">
       <table>
@@ -1678,7 +1679,7 @@ function ReservationsTable({role, rows, client = false }) {
             <th>Départ</th>
             <th>Montant</th>
             <th>Statut</th>
-            <th></th>
+            {canView && <th></th>}
           </tr>
         </thead>
         <tbody>
@@ -1697,16 +1698,17 @@ function ReservationsTable({role, rows, client = false }) {
               <td>
                 <Status value={b.statut} />
               </td>
-              {role==="RECEPTIONNISTE" &&(
-              <td>
-                <Link
-                  className="btn small"
-                  href={`/${client ? "client" : "reception"}/reservations/${b.id}`}
-                >
-                  <Eye size={14} />
-                  Voir
-                </Link>
-              </td>)}
+              {canView && (
+                <td>
+                  <Link
+                    className="btn small"
+                    href={`/${isClient ? "client" : "reception"}/reservations/${b.id}`}
+                  >
+                    <Eye size={14} />
+                    Voir
+                  </Link>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
